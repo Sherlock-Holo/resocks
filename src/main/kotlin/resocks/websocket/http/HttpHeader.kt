@@ -61,11 +61,11 @@ class HttpHeader {
 
 
     companion object {
-        // get server http header
-        fun getHttpHeader(secWebSocketKey: String) = HttpHeader(false, genSecWebSocketAccept(secWebSocketKey))
+        // offer server http header
+        fun offerHttpHeader(secWebSocketKey: String) = HttpHeader(false, genSecWebSocketAccept(secWebSocketKey))
 
-        // get client http header
-        fun getHttpHeader(): HttpHeader {
+        // offer client http header
+        fun offerHttpHeader(): HttpHeader {
             val array = ByteArray(16)
             Random().nextBytes(array)
             return HttpHeader(true, String(array))
@@ -77,30 +77,39 @@ class HttpHeader {
             return String(Base64.getEncoder().encode(sha1.digest()))
         }
 
-        suspend fun receiveHttpHeader(socket: AsynchronousSocketChannel): HttpHeader {
+        suspend fun getHttpHeader(socket: AsynchronousSocketChannel): HttpHeader {
             val headerCache = LinkedList<Byte>()
             val buffer = ByteBuffer.allocate(4)
             val oldArray = ByteArray(4)
-            var nowArray: ByteArray
-            var haveRead: Int
+            val nowArray = ByteArray(4)
+            var haveRead = 0
 
-            socket.aRead(buffer)
-            System.arraycopy(buffer.array(), 0, oldArray, 0, 4)
+            while (haveRead < 4) {
+                haveRead += socket.aRead(buffer)
+            }
+
+            buffer.flip()
+            buffer.get(nowArray)
+            buffer.clear()
+
+            System.arraycopy(nowArray, 0, oldArray, 0, 4)
             buffer.clear()
             headerCache.addAll(oldArray.asIterable())
 
             loop@ while (true) {
                 haveRead = socket.aRead(buffer)
                 buffer.flip()
-                nowArray = buffer.array()
+                buffer.get(nowArray)
+                buffer.clear()
                 headerCache.addAll(nowArray.asIterable())
+                
                 when (haveRead) {
                     4 -> {
                         if (nowArray.contentEquals("\r\n\r\n".toByteArray())) break@loop
                         else System.arraycopy(nowArray, 0, oldArray, 0, 4)
                     }
                     else -> {
-                        if ((oldArray.sliceArray(haveRead until 4) + nowArray).contentEquals("\r\n\r\n".toByteArray())) break@loop
+                        if ((oldArray.sliceArray(haveRead until 4) + nowArray.sliceArray(0 until haveRead)).contentEquals("\r\n\r\n".toByteArray())) break@loop
                         else {
                             System.arraycopy(oldArray, haveRead, oldArray, 0, 4 - haveRead)
                             System.arraycopy(nowArray, 0, oldArray, 4 - haveRead, haveRead)
