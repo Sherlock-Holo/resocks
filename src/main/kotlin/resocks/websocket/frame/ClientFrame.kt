@@ -136,7 +136,7 @@ class ClientFrame : Frame {
         }
     }
 
-    private fun genCloseFrame(reason: ByteArray?) {
+/*    private fun genCloseFrame(reason: ByteArray?) {
         if (reason != null) {
             if (reason.size > 125) throw WebsocketException("close data's length ${reason.size} is larger than 125")
 
@@ -166,7 +166,7 @@ class ClientFrame : Frame {
             System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
             System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
         }
-    }
+    }*/
 
     private fun genControlFrame(type: String, controlMessage: ByteArray?) {
         if (controlMessage != null) {
