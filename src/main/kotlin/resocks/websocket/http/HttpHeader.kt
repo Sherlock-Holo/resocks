@@ -34,6 +34,8 @@ class HttpHeader {
 
     fun getHeaderByteArray() = header.toByteArray()
 
+    fun getHeaderString() = header
+
     fun checkHttpHeader(): Boolean {
         // check client handshake
 
@@ -56,19 +58,22 @@ class HttpHeader {
         if (headList[1] != "Upgrade: websocket") return false
         if (headList[2] != "Connection: Upgrade") return false
         if (headList[3] != "Sec-WebSocket-Accept: " + genSecWebSocketAccept(secWebSocketKey)) return false
+
         return true
     }
 
 
     companion object {
         // offer server http header
+
         fun offerHttpHeader(secWebSocketKey: String) = HttpHeader(false, genSecWebSocketAccept(secWebSocketKey))
 
         // offer client http header
+
         fun offerHttpHeader(): HttpHeader {
             val array = ByteArray(16)
             Random().nextBytes(array)
-            return HttpHeader(true, String(array))
+            return HttpHeader(true, Base64.getEncoder().encodeToString(array))
         }
 
         fun genSecWebSocketAccept(secWebSocketKey: String): String {
@@ -102,14 +107,16 @@ class HttpHeader {
                 buffer.get(nowArray)
                 buffer.clear()
                 headerCache.addAll(nowArray.asIterable())
-                
+
                 when (haveRead) {
                     4 -> {
                         if (nowArray.contentEquals("\r\n\r\n".toByteArray())) break@loop
                         else System.arraycopy(nowArray, 0, oldArray, 0, 4)
                     }
                     else -> {
-                        if ((oldArray.sliceArray(haveRead until 4) + nowArray.sliceArray(0 until haveRead)).contentEquals("\r\n\r\n".toByteArray())) break@loop
+                        if (
+                        (oldArray.sliceArray(haveRead until 4) +
+                                nowArray.sliceArray(0 until haveRead)).contentEquals("\r\n\r\n".toByteArray())) break@loop
                         else {
                             System.arraycopy(oldArray, haveRead, oldArray, 0, 4 - haveRead)
                             System.arraycopy(nowArray, 0, oldArray, 4 - haveRead, haveRead)
