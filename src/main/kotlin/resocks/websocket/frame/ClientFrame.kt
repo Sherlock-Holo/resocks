@@ -17,15 +17,17 @@ class ClientFrame : Frame {
     constructor(optcode: Int, data: ByteArray?, maskKey: ByteArray? = null) {
         this.opcode = optcode
         when (optcode) {
-            1 -> TODO("opcode is 0x01, data is UTF-8 text")
+            0x1 -> TODO("opcode is 0x01, data is UTF-8 text")
 
-            2 -> genBinaryFrame(data!!, maskKey)
+            0x2 -> genBinaryFrame(data!!, maskKey)
 
-            3, 7, 0xB, 0xF -> TODO("MDN says it has no meaning")
+            0x3, 0x7, 0xB, 0xF -> TODO("MDN says it has no meaning")
+
+            0x8 -> TODO("close frame")
 
             0x9 -> genPingFrame(data)
 
-            0xA -> genPingFrame(data)
+            0xA -> genPongFrame(data)
         }
     }
 
