@@ -14,16 +14,16 @@ class ClientFrame : Frame {
 
 
 
-    constructor(optcode: Int, data: ByteArray?, maskKey: ByteArray? = null) {
-        this.opcode = optcode
-        when (optcode) {
+    constructor(opcode: Int, data: ByteArray?, maskKey: ByteArray? = null) {
+        this.opcode = opcode
+        when (opcode) {
             0x1 -> TODO("opcode is 0x01, data is UTF-8 text")
 
             0x2 -> genBinaryFrame(data!!, maskKey)
 
             0x3, 0x7, 0xB, 0xF -> TODO("MDN says it has no meaning")
 
-            0x8 -> TODO("close frame")
+            0x8 -> genCloseFrame(data)
 
             0x9 -> genPingFrame(data)
 
@@ -138,6 +138,37 @@ class ClientFrame : Frame {
         }
     }
 
+    private fun genCloseFrame(reason: ByteArray?) {
+        if (reason != null) {
+            if (reason.size > 125) throw WebsocketException("close data's length ${reason.size} is larger than 125")
+
+            frameHeader.put((1 shl 7 or 0x8).toByte())
+            frameHeader.put((1 shl 7 or reason.size).toByte())
+
+            frameHeader.flip()
+            val maskKey = ByteArray(4)
+            Random().nextBytes(maskKey)
+            val maskedPingData = mask(maskKey, reason)
+            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
+            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
+            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
+            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
+        } else {
+            val data = "I want to close".toByteArray()
+
+            frameHeader.put((1 shl 7 or 9).toByte())
+            frameHeader.put((1 shl 7 or data.size).toByte())
+
+            frameHeader.flip()
+            val maskKey = ByteArray(4)
+            Random().nextBytes(maskKey)
+            val maskedPingData = mask(maskKey, data)
+            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
+            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
+            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
+            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
+        }
+    }
 
 
 
