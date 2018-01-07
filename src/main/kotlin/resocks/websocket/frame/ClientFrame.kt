@@ -23,16 +23,16 @@ class ClientFrame : Frame {
 
             0x3, 0x7, 0xB, 0xF -> TODO("MDN says it has no meaning")
 
-            0x8 -> genCloseFrame(data)
+            0x8 -> genControlFrame("close", data)
 
-            0x9 -> genPingFrame(data)
+            0x9 -> genControlFrame("ping", data)
 
-            0xA -> genPongFrame(data)
+            0xA -> genControlFrame("pong", data)
         }
     }
 
 
-    private fun genPingFrame(pingData: ByteArray?) {
+/*    private fun genPingFrame(pingData: ByteArray?) {
         if (pingData != null) {
             if (pingData.size > 125) throw WebsocketException("ping data's length ${pingData.size} is larger than 125")
 
@@ -95,9 +95,7 @@ class ClientFrame : Frame {
             System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
             System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
         }
-    }
-
-
+    }*/
 
     private fun genBinaryFrame(data: ByteArray, maskKey: ByteArray?) {
         val dataLength = data.size
@@ -163,6 +161,70 @@ class ClientFrame : Frame {
             val maskKey = ByteArray(4)
             Random().nextBytes(maskKey)
             val maskedPingData = mask(maskKey, data)
+            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
+            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
+            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
+            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
+        }
+    }
+
+    private fun genControlFrame(type: String, controlMessage: ByteArray?) {
+        if (controlMessage != null) {
+            if (controlMessage.size > 125) throw WebsocketException("$type controlMessage's length ${controlMessage.size} is larger than 125")
+
+            when (type) {
+                "ping" -> {
+                    frameHeader.put((1 shl 7 or 0xA).toByte())
+                }
+
+                "pong" -> {
+                    frameHeader.put((1 shl 7 or 0xA).toByte())
+                }
+
+                "close" -> {
+                    frameHeader.put((1 shl 7 or 0x8).toByte())
+                }
+
+                else -> TODO("other type?")
+            }
+
+            frameHeader.put((1 shl 7 or controlMessage.size).toByte())
+
+            frameHeader.flip()
+            val maskKey = ByteArray(4)
+            Random().nextBytes(maskKey)
+            val maskedPingData = mask(maskKey, controlMessage)
+            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
+            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
+            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
+            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
+        } else {
+            val message: ByteArray
+            when (type) {
+                "ping" -> {
+                    frameHeader.put((1 shl 7 or 0xA).toByte())
+                    message = "ping".toByteArray()
+                }
+
+                "pong" -> {
+                    frameHeader.put((1 shl 7 or 0xA).toByte())
+                    message = "pong".toByteArray()
+                }
+
+                "close" -> {
+                    frameHeader.put((1 shl 7 or 0x8).toByte())
+                    message = "close".toByteArray()
+                }
+
+                else -> TODO("other type?")
+            }
+
+            frameHeader.put((1 shl 7 or message.size).toByte())
+
+            frameHeader.flip()
+            val maskKey = ByteArray(4)
+            Random().nextBytes(maskKey)
+            val maskedPingData = mask(maskKey, message)
             content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
             System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
             System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
