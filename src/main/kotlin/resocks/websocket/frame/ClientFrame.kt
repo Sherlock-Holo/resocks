@@ -25,12 +25,12 @@ class ClientFrame : Frame {
 
             0x9 -> genPingFrame(data)
 
-            0xA -> TODO("pong frame")
+            0xA -> genPingFrame(data)
         }
     }
 
 
-    private fun genPingFrame(pingData: ByteArray? = null) {
+    private fun genPingFrame(pingData: ByteArray?) {
         if (pingData != null) {
             if (pingData.size > 125) throw WebsocketException("ping data's length ${pingData.size} is larger than 125")
 
@@ -48,6 +48,38 @@ class ClientFrame : Frame {
             System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
         } else {
             val data = "ping".toByteArray()
+
+            frameHeader.put((1 shl 7 or 9).toByte())
+            frameHeader.put((1 shl 7 or data.size).toByte())
+
+            frameHeader.flip()
+            val maskKey = ByteArray(4)
+            Random().nextBytes(maskKey)
+            val maskedPingData = mask(maskKey, data)
+            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
+            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
+            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
+            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
+        }
+    }
+
+    private fun genPongFrame(pongData: ByteArray?) {
+        if (pongData != null) {
+            if (pongData.size > 125) throw WebsocketException("pong data's length ${pongData.size} is larger than 125")
+
+            frameHeader.put((1 shl 7 or 0xA).toByte())
+            frameHeader.put((1 shl 7 or pongData.size).toByte())
+
+            frameHeader.flip()
+            val maskKey = ByteArray(4)
+            Random().nextBytes(maskKey)
+            val maskedPingData = mask(maskKey, pongData)
+            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
+            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
+            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
+            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
+        } else {
+            val data = "pong".toByteArray()
 
             frameHeader.put((1 shl 7 or 9).toByte())
             frameHeader.put((1 shl 7 or data.size).toByte())
