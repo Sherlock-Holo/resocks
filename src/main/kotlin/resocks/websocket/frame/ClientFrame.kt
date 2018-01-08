@@ -7,17 +7,11 @@ import java.nio.channels.AsynchronousSocketChannel
 import java.util.*
 import kotlin.experimental.xor
 
-class ClientFrame : Frame {
+class ClientFrame(override val opcode: Int, data: ByteArray?, maskKey: ByteArray? = null, val lastOneData: ByteArray? = null) : Frame {
     private val frameHeader = ByteBuffer.allocate(14)
     override lateinit var content: ByteArray
-    override val opcode: Int
-    val lastOneData: ByteArray?
 
-
-
-    constructor(opcode: Int, data: ByteArray?, maskKey: ByteArray? = null, lastOneData: ByteArray? = null) {
-        this.opcode = opcode
-        this.lastOneData = lastOneData
+    init {
         when (opcode) {
             0x1 -> TODO("opcode is 0x01, data is UTF-8 text")
 
@@ -30,11 +24,13 @@ class ClientFrame : Frame {
             0x9 -> genControlFrame("ping", data)
 
             0xA -> genControlFrame("pong", data)
+
+            else -> TODO("other opcode?")
         }
     }
 
 
-/*    private fun genPingFrame(pingData: ByteArray?) {
+    /*    private fun genPingFrame(pingData: ByteArray?) {
         if (pingData != null) {
             if (pingData.size > 125) throw WebsocketException("ping data's length ${pingData.size} is larger than 125")
 
@@ -99,6 +95,38 @@ class ClientFrame : Frame {
         }
     }*/
 
+    /*    private fun genCloseFrame(reason: ByteArray?) {
+        if (reason != null) {
+            if (reason.size > 125) throw WebsocketException("close data's length ${reason.size} is larger than 125")
+
+            frameHeader.put((1 shl 7 or 0x8).toByte())
+            frameHeader.put((1 shl 7 or reason.size).toByte())
+
+            frameHeader.flip()
+            val maskKey = ByteArray(4)
+            Random().nextBytes(maskKey)
+            val maskedPingData = mask(maskKey, reason)
+            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
+            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
+            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
+            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
+        } else {
+            val data = "I want to close".toByteArray()
+
+            frameHeader.put((1 shl 7 or 9).toByte())
+            frameHeader.put((1 shl 7 or data.size).toByte())
+
+            frameHeader.flip()
+            val maskKey = ByteArray(4)
+            Random().nextBytes(maskKey)
+            val maskedPingData = mask(maskKey, data)
+            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
+            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
+            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
+            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
+        }
+    }*/
+
     private fun genBinaryFrame(data: ByteArray, maskKey: ByteArray?) {
         val dataLength = data.size
         frameHeader.put((1 shl 7 or 2).toByte())
@@ -137,38 +165,6 @@ class ClientFrame : Frame {
             System.arraycopy(maskedData, 0, content, frameHeader.limit() + 4, dataLength)
         }
     }
-
-/*    private fun genCloseFrame(reason: ByteArray?) {
-        if (reason != null) {
-            if (reason.size > 125) throw WebsocketException("close data's length ${reason.size} is larger than 125")
-
-            frameHeader.put((1 shl 7 or 0x8).toByte())
-            frameHeader.put((1 shl 7 or reason.size).toByte())
-
-            frameHeader.flip()
-            val maskKey = ByteArray(4)
-            Random().nextBytes(maskKey)
-            val maskedPingData = mask(maskKey, reason)
-            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
-            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
-            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
-            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
-        } else {
-            val data = "I want to close".toByteArray()
-
-            frameHeader.put((1 shl 7 or 9).toByte())
-            frameHeader.put((1 shl 7 or data.size).toByte())
-
-            frameHeader.flip()
-            val maskKey = ByteArray(4)
-            Random().nextBytes(maskKey)
-            val maskedPingData = mask(maskKey, data)
-            content = ByteArray(frameHeader.limit() + 4 + maskedPingData.size)
-            System.arraycopy(frameHeader.array(), 0, content, 0, frameHeader.limit())
-            System.arraycopy(maskKey, 0, content, frameHeader.limit(), 4)
-            System.arraycopy(maskedPingData, 0, content, frameHeader.limit() + 4, maskedPingData.size)
-        }
-    }*/
 
     private fun genControlFrame(type: String, controlMessage: ByteArray?) {
         if (controlMessage != null) {
@@ -234,11 +230,6 @@ class ClientFrame : Frame {
         }
     }
 
-
-
-
-
-
     companion object {
         suspend fun receiveFrame(socket: AsynchronousSocketChannel, lastOneData: ByteArray?): ClientFrame {
 
@@ -252,7 +243,7 @@ class ClientFrame : Frame {
             } else {
                 haveRead = 0
             }
-            
+
             while (haveRead <= 2) {
                 haveRead += socket.aRead(frameHeader)
             }
@@ -261,19 +252,19 @@ class ClientFrame : Frame {
             frameHeader.get(first_2_bytes)
             frameHeader.compact()
             when (first_2_bytes[0].toInt()) {
-                // binary frame
+            // binary frame
                 1 shl 7 or 0x2 -> {
                     opcode = 0x2
                 }
-                // ping frame
+            // ping frame
                 1 shl 7 or 0x9 -> {
                     opcode = 0x9
                 }
-                // pong frame
+            // pong frame
                 1 shl 7 or 0xA -> {
                     opcode = 0xA
                 }
-                // close frame
+            // close frame
                 1 shl 7 or 0x8 -> {
                     opcode = 0x8
                 }
@@ -285,7 +276,7 @@ class ClientFrame : Frame {
             val initPayloadLength = first_2_bytes[1].toInt() and 0x7F
             val payloadLength: Int
 
-            when  {
+            when {
                 initPayloadLength <= 125 -> {
                     payloadLength = initPayloadLength
                     haveRead -= 2
