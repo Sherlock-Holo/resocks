@@ -232,7 +232,6 @@ class ClientFrame(override val opcode: Int, data: ByteArray?, maskKey: ByteArray
 
     companion object {
         suspend fun receiveFrame(socket: AsynchronousSocketChannel, lastOneData: ByteArray?): ClientFrame {
-
             val frameHeader = ByteBuffer.allocate(14)
             val opcode: Int
             var haveRead: Int
@@ -280,6 +279,38 @@ class ClientFrame(override val opcode: Int, data: ByteArray?, maskKey: ByteArray
                 initPayloadLength <= 125 -> {
                     payloadLength = initPayloadLength
                     haveRead -= 2
+
+                    while (haveRead < 4) {
+                        haveRead += socket.aRead(frameHeader)
+                    }
+                    frameHeader.flip()
+
+                    if (haveRead >= 4 + payloadLength) {
+                        val maskKey = ByteArray(4)
+                        var data = ByteArray(payloadLength)
+                        frameHeader.get(maskKey)
+                        frameHeader.get(data)
+
+                        data = mask(maskKey, data)
+                        if (haveRead != 4 + payloadLength) {
+                            val lastData = ByteArray(haveRead - 4 - payloadLength)
+                            frameHeader.get(lastData)
+                            return ClientFrame(opcode, data, maskKey, lastData)
+                        } else return ClientFrame(opcode, data, maskKey)
+
+                    } else {
+                        val maskKey = ByteArray(4)
+                        frameHeader.get(maskKey)
+                        val firstPart = ByteArray(haveRead - 4)
+                        frameHeader.get(firstPart)
+
+                        val haveNotRead = payloadLength - (haveRead - 4)
+                        val secondPart = ByteBuffer.allocate(haveNotRead)
+                        haveRead = 0
+                        while (haveRead < haveNotRead) haveRead += socket.aRead(secondPart)
+
+                        return ClientFrame(opcode, mask(maskKey, firstPart + secondPart.array()), maskKey)
+                    }
                 }
 
                 initPayloadLength == 126 -> {
@@ -290,6 +321,33 @@ class ClientFrame(override val opcode: Int, data: ByteArray?, maskKey: ByteArray
                     payloadLength = frameHeader.int
                     frameHeader.compact()
                     haveRead -= 4
+
+                    /*while (haveRead < 4) {
+                        haveRead += socket.aRead(frameHeader)
+                    }
+                    frameHeader.flip()
+
+                    if (haveRead == 4) {
+                        val maskKey = ByteArray(4)
+                        frameHeader.get(maskKey)
+                        val contentBuffer = ByteBuffer.allocate(payloadLength)
+                        haveRead = 0
+                        while (haveRead < payloadLength) haveRead += socket.aRead(contentBuffer)
+                        return ClientFrame(opcode, mask(maskKey, contentBuffer.array()), maskKey)
+                    } else {
+                        val maskKey = ByteArray(4)
+                        frameHeader.get(maskKey)
+
+                        val firstPart = ByteArray(haveRead - 4)
+                        frameHeader.get(firstPart)
+
+                        val haveNotRead = payloadLength - (haveRead - 4)
+                        val secondPart = ByteBuffer.allocate(haveNotRead)
+                        haveRead = 0
+                        while (haveRead < haveNotRead) haveRead += socket.aRead(secondPart)
+
+                        return ClientFrame(opcode, mask(maskKey, firstPart + secondPart.array()), maskKey)
+                    }*/
                 }
 
                 initPayloadLength == 127 -> {
@@ -300,24 +358,96 @@ class ClientFrame(override val opcode: Int, data: ByteArray?, maskKey: ByteArray
                     payloadLength = frameHeader.long.toInt()
                     frameHeader.compact()
                     haveRead -= 10
+
+                    /*while (haveRead < 4) {
+                        haveRead += socket.aRead(frameHeader)
+                    }
+                    frameHeader.flip()
+
+                    if (haveRead == 4) {
+                        val maskKey = ByteArray(4)
+                        frameHeader.get(maskKey)
+                        val contentBuffer = ByteBuffer.allocate(payloadLength)
+                        haveRead = 0
+                        while (haveRead < payloadLength) haveRead += socket.aRead(contentBuffer)
+                        return ClientFrame(opcode, mask(maskKey, contentBuffer.array()), maskKey)
+                    } else {
+                        val maskKey = ByteArray(4)
+                        frameHeader.get(maskKey)
+
+                        val firstPart = ByteArray(haveRead - 4)
+                        frameHeader.get(firstPart)
+
+                        val haveNotRead = payloadLength - (haveRead - 4)
+                        val secondPart = ByteBuffer.allocate(haveNotRead)
+                        haveRead = 0
+                        while (haveRead < haveNotRead) haveRead += socket.aRead(secondPart)
+
+                        return ClientFrame(opcode, mask(maskKey, firstPart + secondPart.array()), maskKey)
+                    }*/
                 }
 
                 else -> TODO("other initPayloadLength?")
             }
 
-            while (haveRead < 4 + payloadLength) {
+            while (haveRead < 4) {
                 haveRead += socket.aRead(frameHeader)
             }
             frameHeader.flip()
-            val maskKey = ByteArray(4)
-            var data = ByteArray(payloadLength)
 
-            frameHeader.get(maskKey)
-            frameHeader.compact()
+            if (haveRead == 4) {
+                val maskKey = ByteArray(4)
+                frameHeader.get(maskKey)
+                val contentBuffer = ByteBuffer.allocate(payloadLength)
+                haveRead = 0
+                while (haveRead < payloadLength) haveRead += socket.aRead(contentBuffer)
+                return ClientFrame(opcode, mask(maskKey, contentBuffer.array()), maskKey)
+            } else {
+                val maskKey = ByteArray(4)
+                frameHeader.get(maskKey)
 
-            data = mask(maskKey, data)
+                val firstPart = ByteArray(haveRead - 4)
+                frameHeader.get(firstPart)
 
-            haveRead = haveRead - 4 - payloadLength
+                val haveNotRead = payloadLength - (haveRead - 4)
+                val secondPart = ByteBuffer.allocate(haveNotRead)
+                haveRead = 0
+                while (haveRead < haveNotRead) haveRead += socket.aRead(secondPart)
+
+                return ClientFrame(opcode, mask(maskKey, firstPart + secondPart.array()), maskKey)
+            }
+
+            /*while (haveRead < 4) {
+                haveRead += socket.aRead(frameHeader)
+            }
+            frameHeader.flip()
+
+            // length <= 125
+            if (haveRead > 4 + payloadLength) {
+                val maskKey = ByteArray(4)
+                var data = ByteArray(payloadLength)
+                frameHeader.get(maskKey)
+                frameHeader.get(data)
+
+                data = mask(maskKey, data)
+                val lastData = ByteArray(haveRead - 4 - payloadLength)
+                frameHeader.get(lastData)
+                return ClientFrame(opcode, data, maskKey, lastData)
+            }*/
+
+            // 125 < length <= 65535
+
+
+
+            /*val maskKey = ByteArray(4)
+            var data = ByteArray(payloadLength)*/
+
+            /*frameHeader.get(maskKey)
+            frameHeader.compact()*/
+
+//            data = mask(maskKey, data)
+
+            /*haveRead = haveRead - 4 - payloadLength
 
             return if (haveRead > 0) {
                 val lastData = ByteArray(haveRead)
@@ -325,7 +455,7 @@ class ClientFrame(override val opcode: Int, data: ByteArray?, maskKey: ByteArray
                 ClientFrame(opcode, data, maskKey, lastData)
             } else {
                 ClientFrame(opcode, data, maskKey)
-            }
+            }*/
         }
 
         private fun mask(maskKey: ByteArray, data: ByteArray): ByteArray {
