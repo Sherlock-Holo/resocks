@@ -109,7 +109,7 @@ class ServerFrame(override val opcode: Int, data: ByteArray?, val lastOneData: B
     }
 
     companion object {
-        suspend fun receiveFrame(socket: AsynchronousSocketChannel, lastOneData: ByteArray?): ServerFrame {
+        suspend fun receiveFrame(socket: AsynchronousSocketChannel, lastOneData: ByteArray? = null): ServerFrame {
             val frameHeader = ByteBuffer.allocate(10)
             val opcode: Int
             var haveRead: Int

@@ -10,7 +10,7 @@ class HttpHeaderTest {
     fun getHeaderByteArray() {
         assertArrayEquals(
                 "http header test failed!",
-                ("HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "Connection: Upgrade\r\n" +
+                ("HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "ClientConnection: Upgrade\r\n" +
                         "Sec-WebSocket-Accept: fFBooB7FAkLlXgRSz0BT3v4hq5s=\r\n\r\n").toByteArray(),
                 HttpHeader.offerHttpHeader("sN9cRrP/n9NdMgdcy2VJFQ==").getHeaderByteArray()
         )
@@ -19,7 +19,7 @@ class HttpHeaderTest {
     @Test
     fun getHeaderString() {
         assertEquals(
-                "HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "Connection: Upgrade\r\n" +
+                "HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "ClientConnection: Upgrade\r\n" +
                         "Sec-WebSocket-Accept: fFBooB7FAkLlXgRSz0BT3v4hq5s=\r\n\r\n",
                 HttpHeader.offerHttpHeader("sN9cRrP/n9NdMgdcy2VJFQ==").getHeaderString()
         )
@@ -38,7 +38,7 @@ class HttpHeaderTest {
     @Test
     fun offerHttpHeader() {
         assertEquals(
-                "HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "Connection: Upgrade\r\n" +
+                "HTTP/1.1 101 Switching Protocols\r\n" + "Upgrade: websocket\r\n" + "ClientConnection: Upgrade\r\n" +
                         "Sec-WebSocket-Accept: fFBooB7FAkLlXgRSz0BT3v4hq5s=\r\n\r\n",
                 HttpHeader.offerHttpHeader("sN9cRrP/n9NdMgdcy2VJFQ==").getHeaderString()
         )
