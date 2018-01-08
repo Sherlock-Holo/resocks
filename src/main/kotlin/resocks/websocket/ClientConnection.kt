@@ -1,6 +1,7 @@
 package resocks.websocket
 
 import kotlinx.coroutines.experimental.async
+import kotlinx.coroutines.experimental.channels.LinkedListChannel
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aWrite
 import resocks.websocket.frame.Frame
@@ -9,11 +10,10 @@ import resocks.websocket.http.HttpHeader
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
-import java.util.concurrent.ConcurrentLinkedDeque
 
 class ClientConnection(val host: String, val port: Int) {
-    private val receiveMessageQueue = ConcurrentLinkedDeque<Frame>()
-    private val sendMessageQueue = ConcurrentLinkedDeque<Frame>()
+    private val receiveMessageQueue = LinkedListChannel<Frame>()
+    private val sendMessageQueue = LinkedListChannel<Frame>()
     private var closing = false
     private lateinit var connection: AsynchronousSocketChannel
 
@@ -46,7 +46,7 @@ class ClientConnection(val host: String, val port: Int) {
             when (serverFrame.opcode) {
                 0x1 -> TODO("opcode is 0x01, data is UTF-8 text")
 
-                0x2 -> receiveMessageQueue.add(serverFrame)
+                0x2 -> receiveMessageQueue.send(serverFrame)
 
                 0x3, 0x7, 0xB, 0xF -> TODO("MDN says it has no meaning")
             }
@@ -55,7 +55,7 @@ class ClientConnection(val host: String, val port: Int) {
 
     suspend private fun write() {
         while (true) {
-            val clientFrame = sendMessageQueue.remove()
+            val clientFrame = sendMessageQueue.receive()
             connection.aWrite(ByteBuffer.wrap(clientFrame.content))
         }
     }
