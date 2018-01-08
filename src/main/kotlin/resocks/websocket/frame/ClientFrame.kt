@@ -174,7 +174,7 @@ class ClientFrame : Frame {
 
             when (type) {
                 "ping" -> {
-                    frameHeader.put((1 shl 7 or 0xA).toByte())
+                    frameHeader.put((1 shl 7 or 0x9).toByte())
                 }
 
                 "pong" -> {
@@ -202,7 +202,7 @@ class ClientFrame : Frame {
             val message: ByteArray
             when (type) {
                 "ping" -> {
-                    frameHeader.put((1 shl 7 or 0xA).toByte())
+                    frameHeader.put((1 shl 7 or 0x9).toByte())
                     message = "ping".toByteArray()
                 }
 
@@ -240,10 +240,82 @@ class ClientFrame : Frame {
     companion object {
         suspend fun receiveFrame(socket: AsynchronousSocketChannel): ClientFrame {
             val frameHeader = ByteBuffer.allocate(14)
+            val opcode: Int
             var haveRead = 0
             while (haveRead <= 2) {
                 haveRead += socket.aRead(frameHeader)
             }
+            frameHeader.flip()
+            val first_2_bytes = ByteArray(2)
+            frameHeader.get(first_2_bytes)
+            frameHeader.compact()
+            when (first_2_bytes[0].toInt()) {
+                // binary frame
+                1 shl 7 or 0x2 -> {
+                    opcode = 0x2
+                }
+                // ping frame
+                1 shl 7 or 0x9 -> {
+                    opcode = 0x9
+                }
+                // pong frame
+                1 shl 7 or 0xA -> {
+                    opcode = 0xA
+                }
+                // close frame
+                1 shl 7 or 0x8 -> {
+                    opcode = 0x8
+                }
+                else -> {
+                    TODO("other opcode?")
+                }
+            }
+
+            val initPayloadLength = first_2_bytes[1].toInt() and 0x7F
+            val payloadLength: Int
+
+            when  {
+                initPayloadLength <= 125 -> {
+                    payloadLength = initPayloadLength
+                    haveRead -= 2
+                }
+
+                initPayloadLength == 126 -> {
+                    while (haveRead < 4) {
+                        haveRead += socket.aRead(frameHeader)
+                    }
+                    frameHeader.flip()
+                    payloadLength = frameHeader.int
+                    frameHeader.compact()
+                    haveRead -= 4
+                }
+
+                initPayloadLength == 127 -> {
+                    while (haveRead < 10) {
+                        haveRead += socket.aRead(frameHeader)
+                    }
+                    frameHeader.flip()
+                    payloadLength = frameHeader.long.toInt()
+                    frameHeader.compact()
+                    haveRead -= 10
+                }
+
+                else -> TODO("other initPayloadLength?")
+            }
+
+            while (haveRead < 4 + payloadLength) {
+                haveRead += socket.aRead(frameHeader)
+            }
+            frameHeader.flip()
+            val maskKey = ByteArray(4)
+            var data = ByteArray(payloadLength)
+
+            frameHeader.get(maskKey)
+            frameHeader.compact()
+
+            data = mask(maskKey, data)
+
+            return ClientFrame(opcode, data, maskKey)
         }
 
         private fun mask(maskKey: ByteArray, data: ByteArray): ByteArray {
