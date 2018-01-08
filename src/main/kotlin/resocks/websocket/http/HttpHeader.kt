@@ -9,11 +9,11 @@ import java.util.*
 class HttpHeader {
     private val header: String
 
-    private constructor(isClient: Boolean, value: String) {
+    private constructor(isClient: Boolean, value: String, host: String = "github.com") {
         val headerBuilder = StringBuilder()
         header = if (isClient) {
             headerBuilder.append("GET /chat HTTP/1.1\r\n")
-            headerBuilder.append("Host: github.com\r\n")
+            headerBuilder.append("Host: $host\r\n")
             headerBuilder.append("Upgrade: websocket\r\n")
             headerBuilder.append("Connection: Upgrade\r\n")
             headerBuilder.append("Sec-WebSocket-Key: $value\r\n")
