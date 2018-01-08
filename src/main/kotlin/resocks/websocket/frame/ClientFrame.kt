@@ -11,11 +11,13 @@ class ClientFrame : Frame {
     private val frameHeader = ByteBuffer.allocate(14)
     override lateinit var content: ByteArray
     override val opcode: Int
+    val lastOneData: ByteArray?
 
 
 
-    constructor(opcode: Int, data: ByteArray?, maskKey: ByteArray? = null) {
+    constructor(opcode: Int, data: ByteArray?, maskKey: ByteArray? = null, lastOneData: ByteArray? = null) {
         this.opcode = opcode
+        this.lastOneData = lastOneData
         when (opcode) {
             0x1 -> TODO("opcode is 0x01, data is UTF-8 text")
 
@@ -238,10 +240,19 @@ class ClientFrame : Frame {
 
 
     companion object {
-        suspend fun receiveFrame(socket: AsynchronousSocketChannel): ClientFrame {
+        suspend fun receiveFrame(socket: AsynchronousSocketChannel, lastOneData: ByteArray?): ClientFrame {
+
             val frameHeader = ByteBuffer.allocate(14)
             val opcode: Int
-            var haveRead = 0
+            var haveRead: Int
+
+            if (lastOneData != null) {
+                frameHeader.put(lastOneData)
+                haveRead = lastOneData.size
+            } else {
+                haveRead = 0
+            }
+            
             while (haveRead <= 2) {
                 haveRead += socket.aRead(frameHeader)
             }
@@ -315,7 +326,15 @@ class ClientFrame : Frame {
 
             data = mask(maskKey, data)
 
-            return ClientFrame(opcode, data, maskKey)
+            haveRead = haveRead - 4 - payloadLength
+
+            return if (haveRead > 0) {
+                val lastData = ByteArray(haveRead)
+                frameHeader.get(lastData)
+                ClientFrame(opcode, data, maskKey, lastData)
+            } else {
+                ClientFrame(opcode, data, maskKey)
+            }
         }
 
         private fun mask(maskKey: ByteArray, data: ByteArray): ByteArray {
