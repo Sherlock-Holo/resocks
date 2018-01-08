@@ -1,6 +1,7 @@
 package resocks.websocket.http
 
 import kotlinx.coroutines.experimental.nio.aRead
+import resocks.websocket.WebsocketException
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.security.MessageDigest
@@ -8,10 +9,14 @@ import java.util.*
 
 class HttpHeader {
     private val header: String
+    val secWebSocketKey: String?
+    val secWebSocketAccept: String?
 
     private constructor(isClient: Boolean, value: String, host: String = "github.com") {
         val headerBuilder = StringBuilder()
         header = if (isClient) {
+            secWebSocketKey = value
+            secWebSocketAccept = null
             headerBuilder.append("GET /chat HTTP/1.1\r\n")
             headerBuilder.append("Host: $host\r\n")
             headerBuilder.append("Upgrade: websocket\r\n")
@@ -20,6 +25,8 @@ class HttpHeader {
             headerBuilder.append("Sec-WebSocket-Version: 13\r\n\r\n")
             headerBuilder.toString()
         } else {
+            secWebSocketKey = null
+            secWebSocketAccept = value
             headerBuilder.append("HTTP/1.1 101 Switching Protocols\r\n")
             headerBuilder.append("Upgrade: websocket\r\n")
             headerBuilder.append("Connection: Upgrade\r\n")
@@ -30,6 +37,16 @@ class HttpHeader {
 
     private constructor(headerCache: ByteArray) {
         header = String(headerCache)
+        val pin: Int
+        if (header.contains("Sec-WebSocket-Key")) {
+            pin = header.indexOf("Sec-WebSocket-Key: ") + "Sec-WebSocket-Key: ".length
+            secWebSocketKey = header.substring(pin, pin + 24)
+            secWebSocketAccept = null
+        } else if (header.contains("Sec-WebSocket-Accept: ")) {
+            pin = header.indexOf("Sec-WebSocket-Accept: ") + "Sec-WebSocket-Accept: ".length
+            secWebSocketKey = null
+            secWebSocketAccept = header.substring(pin, pin + 28)
+        } else throw WebsocketException("secWebSocketKey or secWebSocketAccept not found")
     }
 
     fun getHeaderByteArray() = header.toByteArray()
@@ -37,7 +54,7 @@ class HttpHeader {
     fun getHeaderString() = header
 
     fun checkHttpHeader(): Boolean {
-        // check client handshake
+        // server checks client handshake
 
         val headList = header.substring(0 until header.length - 2).split("\r\n")
 
@@ -50,7 +67,7 @@ class HttpHeader {
     }
 
     fun checkHttpHeader(secWebSocketKey: String): Boolean {
-        // check client handshake
+        // client checks server handshake
 
         val headList = header.substring(0 until header.length - 2).split("\r\n")
 
