@@ -18,7 +18,7 @@ import java.nio.channels.AsynchronousSocketChannel
 class ClientConnection(val host: String, val port: Int) {
     private val receiveMessageQueue = LinkedListChannel<Frame>()
     private val sendMessageQueue = LinkedListChannel<Frame>()
-    private var closeStage = "running"
+    private lateinit var closeStage: ConnectionStage
     private lateinit var connection: AsynchronousSocketChannel
 
     private var clientNotSendOverTime = false
@@ -28,6 +28,7 @@ class ClientConnection(val host: String, val port: Int) {
     suspend fun connect(host: String): ClientConnection {
         connection = AsynchronousSocketChannel.open()
         connection.aConnect(InetSocketAddress(this.host, port))
+        closeStage = ConnectionStage.RUNNING
 
         val clientHttpHeader = HttpHeader.offerHttpHeader()
         connection.aWrite(ByteBuffer.wrap(clientHttpHeader.getHeaderByteArray()))
@@ -68,14 +69,14 @@ class ClientConnection(val host: String, val port: Int) {
 
                 // close frame
                     0x8 -> {
-                        if (closeStage == "closing") {
+                        if (closeStage == ConnectionStage.CLOSING) {
                             connection.shutdownInput()
                             connection.close()
-                            closeStage = "closed"
+                            closeStage = ConnectionStage.CLOSED
                             break@loop
                         } else {
                             val closeFrame = ClientFrame(0x8, serverFrame.content)
-                            closeStage = "beingClose"
+                            closeStage = ConnectionStage.BE_CLOSED
                             sendMessageQueue.send(closeFrame)
                             connection.shutdownInput()
                             break@loop
@@ -110,15 +111,15 @@ class ClientConnection(val host: String, val port: Int) {
                     }
 
                     0x8 -> {
-                        if (closeStage == "closing") {
+                        if (closeStage == ConnectionStage.CLOSED) {
                             connection.aWrite(ByteBuffer.wrap(clientFrame.content))
                             connection.shutdownOutput()
                             break@loop
-                        } else if (closeStage == "beingClose") {
+                        } else if (closeStage == ConnectionStage.BE_CLOSED) {
                             connection.aWrite(ByteBuffer.wrap(clientFrame.content))
                             connection.shutdownOutput()
                             connection.close()
-                            closeStage = "closed"
+                            closeStage = ConnectionStage.CLOSED
                             break@loop
                         }
                     }
@@ -135,7 +136,7 @@ class ClientConnection(val host: String, val port: Int) {
     }
 
     suspend fun close() {
-        closeStage = "closing"
+        closeStage = ConnectionStage.CLOSING
         val closeFrame = ClientFrame(0x8, null)
         sendMessageQueue.send(closeFrame)
     }
