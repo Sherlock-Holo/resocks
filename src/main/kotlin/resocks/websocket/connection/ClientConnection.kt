@@ -37,13 +37,13 @@ class ClientConnection(val host: String, val port: Int) {
             throw WebsocketException("secWebSocketAccept check failed")
         }
 
-        async { read() }
+        async { readFrame() }
 
-        async { write() }
+        async { writeFrame() }
         return this
     }
 
-    suspend private fun read() {
+    suspend private fun readFrame() {
         var lastData: ByteArray? = null
         loop@ while (true) {
             try {
@@ -98,7 +98,7 @@ class ClientConnection(val host: String, val port: Int) {
         }
     }
 
-    suspend private fun write() {
+    suspend private fun writeFrame() {
         loop@ while (true) {
             try {
                 val clientFrame = withTimeout(1000 * 300) {
@@ -139,5 +139,14 @@ class ClientConnection(val host: String, val port: Int) {
         closeStage = ConnectionStage.CLOSING
         val closeFrame = ClientFrame(0x8, null)
         sendMessageQueue.send(closeFrame)
+    }
+
+    suspend fun write(data: ByteArray) {
+        val clientFrame = ClientFrame(2, data)
+        sendMessageQueue.send(clientFrame)
+    }
+
+    suspend fun read(): Frame {
+        return receiveMessageQueue.receive()
     }
 }
