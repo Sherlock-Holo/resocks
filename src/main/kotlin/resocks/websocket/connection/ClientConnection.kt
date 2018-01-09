@@ -1,4 +1,4 @@
-package resocks.websocket
+package resocks.websocket.connection
 
 import kotlinx.coroutines.experimental.TimeoutCancellationException
 import kotlinx.coroutines.experimental.async
@@ -6,6 +6,7 @@ import kotlinx.coroutines.experimental.channels.LinkedListChannel
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aWrite
 import kotlinx.coroutines.experimental.withTimeout
+import resocks.websocket.WebsocketException
 import resocks.websocket.frame.ClientFrame
 import resocks.websocket.frame.Frame
 import resocks.websocket.frame.ServerFrame
@@ -65,15 +66,14 @@ class ClientConnection(val host: String, val port: Int) {
                         pingTimes = 0
                     }
 
-                    // close frame
+                // close frame
                     0x8 -> {
                         if (closeStage == "closing") {
                             connection.shutdownInput()
                             connection.close()
                             closeStage = "closed"
                             break@loop
-                        }
-                        else {
+                        } else {
                             val closeFrame = ClientFrame(0x8, serverFrame.content)
                             closeStage = "beingClose"
                             sendMessageQueue.send(closeFrame)
