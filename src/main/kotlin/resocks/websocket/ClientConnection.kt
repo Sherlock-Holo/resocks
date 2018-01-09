@@ -1,9 +1,12 @@
 package resocks.websocket
 
+import kotlinx.coroutines.experimental.TimeoutCancellationException
 import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.channels.LinkedListChannel
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aWrite
+import kotlinx.coroutines.experimental.withTimeout
+import resocks.websocket.frame.ClientFrame
 import resocks.websocket.frame.Frame
 import resocks.websocket.frame.ServerFrame
 import resocks.websocket.http.HttpHeader
@@ -14,8 +17,12 @@ import java.nio.channels.AsynchronousSocketChannel
 class ClientConnection(val host: String, val port: Int) {
     private val receiveMessageQueue = LinkedListChannel<Frame>()
     private val sendMessageQueue = LinkedListChannel<Frame>()
-    private var closing = false
+    private var closeStage = "running"
     private lateinit var connection: AsynchronousSocketChannel
+
+    private var clientNotSendOverTime = false
+
+    private var pingTimes = 0
 
     suspend fun connect(host: String): ClientConnection {
         connection = AsynchronousSocketChannel.open()
@@ -28,35 +35,108 @@ class ClientConnection(val host: String, val port: Int) {
             throw WebsocketException("secWebSocketAccept check failed")
         }
 
-        async {
-            read()
-        }
+        async { read() }
 
-        async {
-            write()
-        }
+        async { write() }
         return this
     }
 
     suspend private fun read() {
         var lastData: ByteArray? = null
-        while (true) {
-            val serverFrame = ServerFrame.receiveFrame(connection, lastData)
-            lastData = serverFrame.lastOneData
-            when (serverFrame.opcode) {
-                0x1 -> TODO("opcode is 0x01, data is UTF-8 text")
+        loop@ while (true) {
+            try {
+                val serverFrame = withTimeout(1000 * 300) {
+                    ServerFrame.receiveFrame(connection, lastData)
+                }
+                lastData = serverFrame.lastOneData
+                when (serverFrame.opcode) {
+                    0x1 -> TODO("opcode is 0x01, data is UTF-8 text")
 
-                0x2 -> receiveMessageQueue.send(serverFrame)
+                    0x2 -> receiveMessageQueue.send(serverFrame)
 
-                0x3, 0x7, 0xB, 0xF -> TODO("MDN says it has no meaning")
+                    0x3, 0x7, 0xB, 0xF -> TODO("MDN says it has no meaning")
+
+                    0x9 -> {
+                        val pongFrame = ClientFrame(0xA, serverFrame.content)
+                        sendMessageQueue.send(pongFrame)
+                    }
+
+                    0xA -> {
+                        pingTimes = 0
+                    }
+
+                    // close frame
+                    0x8 -> {
+                        if (closeStage == "closing") {
+                            connection.shutdownInput()
+                            connection.close()
+                            closeStage = "closed"
+                            break@loop
+                        }
+                        else {
+                            val closeFrame = ClientFrame(0x8, serverFrame.content)
+                            closeStage = "beingClose"
+                            sendMessageQueue.send(closeFrame)
+                            connection.shutdownInput()
+                            break@loop
+                        }
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                if (pingTimes >= 3) {
+                    close()
+                    break@loop
+                }
+
+                if (clientNotSendOverTime) {
+                    val pingFrame = ClientFrame(9, null)
+                    sendMessageQueue.send(pingFrame)
+                    pingTimes++
+                }
             }
         }
     }
 
     suspend private fun write() {
-        while (true) {
-            val clientFrame = sendMessageQueue.receive()
-            connection.aWrite(ByteBuffer.wrap(clientFrame.content))
+        loop@ while (true) {
+            try {
+                val clientFrame = withTimeout(1000 * 300) {
+                    sendMessageQueue.receive()
+                }
+                when (clientFrame.opcode) {
+                    0x2 -> {
+                        connection.aWrite(ByteBuffer.wrap(clientFrame.content))
+                        clientNotSendOverTime = false
+                    }
+
+                    0x8 -> {
+                        if (closeStage == "closing") {
+                            connection.aWrite(ByteBuffer.wrap(clientFrame.content))
+                            connection.shutdownOutput()
+                            break@loop
+                        } else if (closeStage == "beingClose") {
+                            connection.aWrite(ByteBuffer.wrap(clientFrame.content))
+                            connection.shutdownOutput()
+                            connection.close()
+                            closeStage = "closed"
+                            break@loop
+                        }
+                    }
+
+                    0x9 -> {
+                        connection.aWrite(ByteBuffer.wrap(clientFrame.content))
+                        clientNotSendOverTime = true
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                clientNotSendOverTime = true
+            }
         }
+    }
+
+    suspend fun close() {
+        closeStage = "closing"
+        val closeFrame = ClientFrame(0x8, null)
+        sendMessageQueue.send(closeFrame)
     }
 }
