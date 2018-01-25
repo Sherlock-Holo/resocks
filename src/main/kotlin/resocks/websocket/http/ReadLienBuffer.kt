@@ -11,7 +11,9 @@ class ReadLienBuffer(private val socketChannel: AsynchronousSocketChannel, priva
     suspend fun readLine(): String {
         builder.delete(0, builder.length)
         while (true) {
-            if (socketChannel.aRead(buffer) <= 0) throw WebsocketException("read http header failed")
+            if (!buffer.hasRemaining()) {
+                if (socketChannel.aRead(buffer) <= 0) throw WebsocketException("read http header failed")
+            }
 
             buffer.flip()
 
