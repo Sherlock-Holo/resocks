@@ -10,7 +10,7 @@ class ReadLienBuffer(private val socketChannel: AsynchronousSocketChannel, priva
     private val builder = StringBuilder()
 
     suspend fun readLine(): String {
-        builder.removeRange(0 until builder.length)
+        builder.delete(0, builder.length)
         while (true) {
             if (socketChannel.aRead(buffer) <= 0) TODO("maybe throw exception?")
 
