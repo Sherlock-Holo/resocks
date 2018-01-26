@@ -7,6 +7,7 @@ import java.nio.channels.AsynchronousSocketChannel
 
 class ReadLienBuffer(private val socketChannel: AsynchronousSocketChannel, private val buffer: ByteBuffer) {
     private val builder = StringBuilder()
+    private lateinit var otherBytes: ByteArray
 
     suspend fun readLine(): String {
         builder.delete(0, builder.length)
@@ -24,6 +25,10 @@ class ReadLienBuffer(private val socketChannel: AsynchronousSocketChannel, priva
 
                     '\n'.toByte() -> {
                         buffer.compact()
+                        buffer.flip()
+                        otherBytes = ByteArray(buffer.limit())
+                        buffer.get(otherBytes)
+                        buffer.limit(buffer.capacity())
                         return builder.toString()
                     }
 
@@ -33,4 +38,6 @@ class ReadLienBuffer(private val socketChannel: AsynchronousSocketChannel, priva
             buffer.clear()
         }
     }
+
+    fun getOhterBytes() = otherBytes
 }

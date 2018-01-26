@@ -1,6 +1,5 @@
 package resocks.websocket.http
 
-import kotlinx.coroutines.experimental.nio.aRead
 import resocks.websocket.WebsocketException
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
@@ -11,6 +10,7 @@ class HttpHeader {
     private val header: String
     val secWebSocketKey: String?
     val secWebSocketAccept: String?
+    private var otherBytes: ByteArray? = null
 
     private constructor(isClient: Boolean, value: String, host: String = "github.com") {
         val headerBuilder = StringBuilder()
@@ -35,8 +35,9 @@ class HttpHeader {
         }
     }
 
-    private constructor(headerCache: ByteArray) {
-        header = String(headerCache)
+    private constructor(header: String, otherBytes: ByteArray) {
+        this.header = header
+        this.otherBytes = otherBytes
         val pin: Int
         if (header.contains("Sec-WebSocket-Key")) {
             pin = header.indexOf("Sec-WebSocket-Key: ") + "Sec-WebSocket-Key: ".length
@@ -79,6 +80,8 @@ class HttpHeader {
         return true
     }
 
+    fun getOtherBytes() = otherBytes
+
 
     companion object {
         // offer server http header
@@ -100,7 +103,7 @@ class HttpHeader {
         }
 
         suspend fun getHttpHeader(socket: AsynchronousSocketChannel): HttpHeader {
-            val headerCache = LinkedList<Byte>()
+            /*val headerCache = LinkedList<Byte>()
             val buffer = ByteBuffer.allocate(4)
             val oldArray = ByteArray(4)
             val nowArray = ByteArray(4)
@@ -142,8 +145,19 @@ class HttpHeader {
                 }
                 buffer.clear()
             }
-//            return headerCache.toByteArray()
-            return HttpHeader(headerCache.toByteArray())
+            return HttpHeader(headerCache.toByteArray())*/
+
+            val buffer = ByteBuffer.allocate(4096)
+            val lineBuffer = ReadLienBuffer(socket, buffer)
+            val stringBuilder = StringBuilder()
+            while (true) {
+                val line = lineBuffer.readLine()
+                if (line != "") stringBuilder.append(line + "\r\n")
+                else {
+                    stringBuilder.append("\r\n")
+                    return HttpHeader(stringBuilder.toString(), lineBuffer.getOhterBytes())
+                }
+            }
         }
     }
 }
