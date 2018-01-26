@@ -5,7 +5,7 @@ import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
-class AES_256_CTR(key: ByteArray, private var iv: ByteArray? = null): GeneralCipher {
+internal class AES_256_CTR(key: ByteArray, private var iv: ByteArray? = null) : GeneralCipher {
     private val cipher = Cipher.getInstance("AES/CTR/NoPadding")
     private val skey = SecretKeySpec(key, "AES")
 
