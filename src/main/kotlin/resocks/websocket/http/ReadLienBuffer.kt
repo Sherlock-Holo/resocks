@@ -5,6 +5,7 @@ import resocks.websocket.WebsocketException
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
+@Deprecated("no long use it", ReplaceWith("ReadsBuffer"))
 class ReadLienBuffer(private val socketChannel: AsynchronousSocketChannel, private val buffer: ByteBuffer) {
     private val builder = StringBuilder()
     private lateinit var otherBytes: ByteArray

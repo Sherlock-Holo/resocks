@@ -1,8 +1,7 @@
 package resocks.websocket.http
 
+import resocks.readsBuffer.ReadsBuffer
 import resocks.websocket.WebsocketException
-import java.nio.ByteBuffer
-import java.nio.channels.AsynchronousSocketChannel
 import java.security.MessageDigest
 import java.util.*
 
@@ -10,7 +9,6 @@ class HttpHeader {
     private val header: String
     val secWebSocketKey: String?
     val secWebSocketAccept: String?
-    private var otherBytes: ByteArray? = null
 
     private constructor(isClient: Boolean, value: String, host: String = "github.com") {
         val headerBuilder = StringBuilder()
@@ -35,9 +33,8 @@ class HttpHeader {
         }
     }
 
-    private constructor(header: String, otherBytes: ByteArray) {
+    private constructor(header: String) {
         this.header = header
-        this.otherBytes = otherBytes
         val pin: Int
         if (header.contains("Sec-WebSocket-Key")) {
             pin = header.indexOf("Sec-WebSocket-Key: ") + "Sec-WebSocket-Key: ".length
@@ -80,9 +77,6 @@ class HttpHeader {
         return true
     }
 
-    fun getOtherBytes() = otherBytes
-
-
     companion object {
         // offer server http header
 
@@ -102,60 +96,13 @@ class HttpHeader {
             return String(Base64.getEncoder().encode(sha1.digest()))
         }
 
-        suspend fun getHttpHeader(socket: AsynchronousSocketChannel): HttpHeader {
-            /*val headerCache = LinkedList<Byte>()
-            val buffer = ByteBuffer.allocate(4)
-            val oldArray = ByteArray(4)
-            val nowArray = ByteArray(4)
-            var haveRead = 0
-
-            while (haveRead < 4) {
-                haveRead += socket.aRead(buffer)
-            }
-
-            buffer.flip()
-            buffer.get(nowArray)
-            buffer.clear()
-
-            System.arraycopy(nowArray, 0, oldArray, 0, 4)
-            buffer.clear()
-            headerCache.addAll(oldArray.asIterable())
-
-            loop@ while (true) {
-                haveRead = socket.aRead(buffer)
-                buffer.flip()
-                buffer.get(nowArray)
-                buffer.clear()
-                headerCache.addAll(nowArray.asIterable())
-
-                when (haveRead) {
-                    4 -> {
-                        if (nowArray.contentEquals("\r\n\r\n".toByteArray())) break@loop
-                        else System.arraycopy(nowArray, 0, oldArray, 0, 4)
-                    }
-                    else -> {
-                        if (
-                        (oldArray.sliceArray(haveRead until 4) +
-                                nowArray.sliceArray(0 until haveRead)).contentEquals("\r\n\r\n".toByteArray())) break@loop
-                        else {
-                            System.arraycopy(oldArray, haveRead, oldArray, 0, 4 - haveRead)
-                            System.arraycopy(nowArray, 0, oldArray, 4 - haveRead, haveRead)
-                        }
-                    }
-                }
-                buffer.clear()
-            }
-            return HttpHeader(headerCache.toByteArray())*/
-
-            val buffer = ByteBuffer.allocate(4096)
-            val lineBuffer = ReadLienBuffer(socket, buffer)
-            val stringBuilder = StringBuilder()
+        suspend fun getHttpHeader(readsBuffer: ReadsBuffer): HttpHeader {
+            val sb = StringBuilder()
             while (true) {
-                val line = lineBuffer.readLine()
-                if (line != "") stringBuilder.append(line + "\r\n")
-                else {
-                    stringBuilder.append("\r\n")
-                    return HttpHeader(stringBuilder.toString(), lineBuffer.getOhterBytes())
+                val line = readsBuffer.readLine()
+                sb.append(line)
+                if (line == "") {
+                    return HttpHeader(sb.toString())
                 }
             }
         }
