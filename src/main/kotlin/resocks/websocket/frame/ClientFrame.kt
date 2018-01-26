@@ -6,14 +6,12 @@ import java.nio.ByteBuffer
 import java.util.*
 import kotlin.experimental.xor
 
-class ClientFrame(type: FrameType, data: ByteArray?, maskKey: ByteArray? = null) : Frame {
-    private val frameHeader = ByteBuffer.allocate(14)
+class ClientFrame(override val frameType: FrameType, data: ByteArray?, maskKey: ByteArray? = null) : Frame {
     override lateinit var content: ByteArray
-    override val opcode: Int
-    override val frameType: FrameType = type
+    override var opcode: Int? = null
 
     init {
-        when (type) {
+        when (frameType) {
             FrameType.TEXT -> {
                 opcode = 0x1
                 TODO("opcode is 0x01, data is UTF-8 text")
@@ -24,24 +22,12 @@ class ClientFrame(type: FrameType, data: ByteArray?, maskKey: ByteArray? = null)
                 genBinaryFrame(data!!, maskKey)
             }
 
-            FrameType.CLOSE -> {
-                opcode = 0x8
-                genControlFrame("close", data)
-            }
-
-            FrameType.PING -> {
-                opcode = 0x9
-                genControlFrame("ping", data)
-            }
-
-            FrameType.PONG -> {
-                opcode = 0xA
-                genControlFrame("pong", data)
-            }
+            else -> genControlFrame(frameType, data)
         }
     }
 
     private fun genBinaryFrame(data: ByteArray, maskKey: ByteArray?) {
+        val frameHeader = ByteBuffer.allocate(14)
         val dataLength = data.size
         frameHeader.put((1 shl 7 or 2).toByte())
 
@@ -80,20 +66,24 @@ class ClientFrame(type: FrameType, data: ByteArray?, maskKey: ByteArray? = null)
         }
     }
 
-    private fun genControlFrame(type: String, controlMessage: ByteArray?) {
+    private fun genControlFrame(type: FrameType, controlMessage: ByteArray?) {
+        val frameHeader = ByteBuffer.allocate(14)
         if (controlMessage != null) {
             if (controlMessage.size > 125) throw WebsocketException("$type controlMessage's length ${controlMessage.size} is larger than 125")
 
             when (type) {
-                "ping" -> {
+                FrameType.PING -> {
+                    opcode = 0x9
                     frameHeader.put((1 shl 7 or 0x9).toByte())
                 }
 
-                "pong" -> {
+                FrameType.PONG -> {
+                    opcode = 0xA
                     frameHeader.put((1 shl 7 or 0xA).toByte())
                 }
 
-                "close" -> {
+                FrameType.CLOSE -> {
+                    opcode = 0x8
                     frameHeader.put((1 shl 7 or 0x8).toByte())
                 }
 
@@ -113,17 +103,20 @@ class ClientFrame(type: FrameType, data: ByteArray?, maskKey: ByteArray? = null)
         } else {
             val message: ByteArray
             when (type) {
-                "ping" -> {
+                FrameType.PING -> {
+                    opcode = 0x9
                     frameHeader.put((1 shl 7 or 0x9).toByte())
                     message = "ping".toByteArray()
                 }
 
-                "pong" -> {
+                FrameType.PONG -> {
+                    opcode = 0xA
                     frameHeader.put((1 shl 7 or 0xA).toByte())
                     message = "pong".toByteArray()
                 }
 
-                "close" -> {
+                FrameType.CLOSE -> {
+                    opcode = 0x8
                     frameHeader.put((1 shl 7 or 0x8).toByte())
                     message = "close".toByteArray()
                 }
@@ -172,9 +165,8 @@ class ClientFrame(type: FrameType, data: ByteArray?, maskKey: ByteArray? = null)
             }
 
             val initPayloadLength = frameHeader[1].toInt() and 0x7F
-            val payloadLength: Int
 
-            payloadLength = when {
+            val payloadLength = when {
                 initPayloadLength <= 125 -> {
                     initPayloadLength
                 }

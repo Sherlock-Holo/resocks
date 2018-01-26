@@ -1,33 +1,28 @@
 package resocks.websocket.frame
 
-import kotlinx.coroutines.experimental.nio.aRead
+import resocks.readsBuffer.ReadsBuffer
 import resocks.websocket.WebsocketException
 import java.nio.ByteBuffer
-import java.nio.channels.AsynchronousSocketChannel
 
-class ServerFrame(override val opcode: Int, data: ByteArray?, val lastOneData: ByteArray? = null) : Frame {
-    private val frameHeader = ByteBuffer.allocate(10)
+class ServerFrame(override val frameType: FrameType, data: ByteArray?) : Frame {
     override lateinit var content: ByteArray
+    override var opcode: Int? = null
 
     init {
-        when (opcode) {
-            0x1 -> TODO("opcode is 0x01, data is UTF-8 text")
+        when (frameType) {
+            FrameType.TEXT -> TODO("opcode is 0x01, data is UTF-8 text")
 
-            0x2 -> genBinaryFrame(data!!)
+            FrameType.BINARY -> {
+                opcode = 0x2
+                genBinaryFrame(data!!)
+            }
 
-            0x3, 0x7, 0xB, 0xF -> TODO("MDN says it has no meaning")
-
-            0x8 -> genControlFrame("close", data)
-
-            0x9 -> genControlFrame("ping", data)
-
-            0xA -> genControlFrame("pong", data)
-
-            else -> TODO("other opcode?")
+            else -> genControlFrame(frameType, data)
         }
     }
 
     private fun genBinaryFrame(data: ByteArray) {
+        val frameHeader = ByteBuffer.allocate(10)
         val dataLength = data.size
         frameHeader.put((1 shl 7 or 2).toByte())
 
@@ -53,20 +48,24 @@ class ServerFrame(override val opcode: Int, data: ByteArray?, val lastOneData: B
         System.arraycopy(data, 0, content, frameHeader.limit(), dataLength)
     }
 
-    private fun genControlFrame(type: String, controlMessage: ByteArray?) {
+    private fun genControlFrame(type: FrameType, controlMessage: ByteArray?) {
+        val frameHeader = ByteBuffer.allocate(10)
         if (controlMessage != null) {
             if (controlMessage.size > 125) throw WebsocketException("$type controlMessage's length ${controlMessage.size} is larger than 125")
 
             when (type) {
-                "ping" -> {
+                FrameType.PING -> {
+                    opcode = 0x9
                     frameHeader.put((1 shl 7 or 0x9).toByte())
                 }
 
-                "pong" -> {
+                FrameType.PONG -> {
+                    opcode = 0xA
                     frameHeader.put((1 shl 7 or 0xA).toByte())
                 }
 
-                "close" -> {
+                FrameType.CLOSE -> {
+                    opcode = 0x8
                     frameHeader.put((1 shl 7 or 0x8).toByte())
                 }
 
@@ -82,17 +81,20 @@ class ServerFrame(override val opcode: Int, data: ByteArray?, val lastOneData: B
             val message: ByteArray
 
             when (type) {
-                "ping" -> {
+                FrameType.PING -> {
+                    opcode = 0x9
                     frameHeader.put((1 shl 7 or 0x9).toByte())
                     message = "ping".toByteArray()
                 }
 
-                "pong" -> {
+                FrameType.PONG -> {
+                    opcode
                     frameHeader.put((1 shl 7 or 0xA).toByte())
                     message = "pong".toByteArray()
                 }
 
-                "close" -> {
+                FrameType.CLOSE -> {
+                    opcode = 0x8
                     frameHeader.put((1 shl 7 or 0x8).toByte())
                     message = "close".toByteArray()
                 }
@@ -109,128 +111,51 @@ class ServerFrame(override val opcode: Int, data: ByteArray?, val lastOneData: B
     }
 
     companion object {
-        suspend fun receiveFrame(socket: AsynchronousSocketChannel, lastOneData: ByteArray? = null): ServerFrame {
-            val frameHeader = ByteBuffer.allocate(10)
-            val opcode: Int
-            var haveRead: Int
+        suspend fun receiveFrame(readsBuffer: ReadsBuffer): ServerFrame {
+            val frameHeader = readsBuffer.reads(2)
+            val type: FrameType
 
-            if (lastOneData != null) {
-                frameHeader.put(lastOneData)
-                haveRead = lastOneData.size
-            } else {
-                haveRead = 0
-            }
-
-            while (haveRead < 2) {
-                haveRead += socket.aRead(frameHeader)
-            }
-            frameHeader.flip()
-
-            val first_2_bytes = ByteArray(2)
-            frameHeader.get(first_2_bytes)
-            frameHeader.compact()
-
-            when (first_2_bytes[0].toInt()) {
+            when (frameHeader[0].toInt()) {
             // binary frame
                 1 shl 7 or 0x2 -> {
-                    opcode = 0x2
+                    type = FrameType.BINARY
                 }
             // ping frame
                 1 shl 7 or 0x9 -> {
-                    opcode = 0x9
+                    type = FrameType.PING
                 }
             // pong frame
                 1 shl 7 or 0xA -> {
-                    opcode = 0xA
+                    type = FrameType.PONG
                 }
             // close frame
                 1 shl 7 or 0x8 -> {
-                    opcode = 0x8
+                    type = FrameType.CLOSE
                 }
                 else -> {
                     TODO("other opcode?")
                 }
             }
 
-            val initPayloadLength = first_2_bytes[1].toInt()
-            val payloadLength: Int
+            val initPayloadLength = frameHeader[1].toInt()
 
-            when {
-                initPayloadLength <= 125 -> {
-                    payloadLength = initPayloadLength
-                    haveRead -= 2
-                    frameHeader.flip()
-
-                    if (haveRead == payloadLength) {
-                        val data = ByteArray(payloadLength)
-                        frameHeader.get(data)
-                        return ServerFrame(opcode, data)
-
-                    } else if (haveRead > payloadLength) {
-                        val data = ByteArray(payloadLength)
-                        frameHeader.get(data)
-                        val lastData = ByteArray(haveRead - payloadLength)
-                        frameHeader.get(lastData)
-                        return ServerFrame(opcode, data, lastData)
-
-                    } else if (haveRead == 0) {
-                        val contentBuffer = ByteBuffer.allocate(payloadLength)
-                        while (haveRead < payloadLength) haveRead += socket.aRead(contentBuffer)
-
-                        return ServerFrame(opcode, contentBuffer.array())
-
-                    } else {
-                        val firstPart = ByteArray(haveRead)
-                        frameHeader.get(firstPart)
-                        val haveNotRead = payloadLength - haveRead
-                        val secondPart = ByteBuffer.allocate(haveNotRead)
-                        haveRead = 0
-                        while (haveRead < haveNotRead) haveRead += socket.aRead(secondPart)
-
-                        return ServerFrame(opcode, firstPart + secondPart.array())
-                    }
-                }
+            val payloadLength = when {
+                initPayloadLength <= 125 -> initPayloadLength
 
                 initPayloadLength == 126 -> {
-                    while (haveRead < 4) {
-                        haveRead += socket.aRead(frameHeader)
-                    }
-                    payloadLength = frameHeader.int
-                    frameHeader.compact()
-                    haveRead -= 4
-                    frameHeader.flip()
+                    ByteUtils.getShortFromByteArray(readsBuffer.reads(2)).toInt()
                 }
 
                 initPayloadLength == 127 -> {
-                    while (haveRead < 10) {
-                        haveRead += socket.aRead(frameHeader)
-                    }
-                    payloadLength = frameHeader.long.toInt()
-                    frameHeader.compact()
-                    haveRead -= 10
-                    frameHeader.flip()
+                    ByteUtils.getLongFromByteArray(readsBuffer.reads(8)).toInt()
                 }
 
                 else -> TODO("other initPayloadLength?")
             }
 
-            if (haveRead == 0) {
-                val contentBuffer = ByteBuffer.allocate(payloadLength)
-                while (haveRead < payloadLength) haveRead += socket.aRead(contentBuffer)
+            val data = readsBuffer.reads(payloadLength)
 
-                return ServerFrame(opcode, contentBuffer.array())
-
-            } else {
-                val firstPart = ByteArray(haveRead)
-                frameHeader.get(firstPart)
-
-                val haveNotRead = payloadLength - haveRead
-                val secondPart = ByteBuffer.allocate(haveNotRead)
-                haveRead = 0
-                while (haveRead < haveNotRead) haveRead += socket.aRead(secondPart)
-
-                return ServerFrame(opcode, firstPart + secondPart.array())
-            }
+            return ServerFrame(type, data)
         }
     }
 }
