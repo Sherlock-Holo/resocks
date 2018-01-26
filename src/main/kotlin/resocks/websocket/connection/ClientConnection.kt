@@ -6,9 +6,10 @@ import kotlinx.coroutines.experimental.channels.LinkedListChannel
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aWrite
 import kotlinx.coroutines.experimental.withTimeout
+import resocks.readsBuffer.ReadsBuffer
 import resocks.websocket.WebsocketException
 import resocks.websocket.frame.ClientFrame
-import resocks.websocket.frame.Frame
+import resocks.websocket.frame.FrameType
 import resocks.websocket.frame.ServerFrame
 import resocks.websocket.http.HttpHeader
 import java.net.InetSocketAddress
@@ -16,137 +17,79 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
 class ClientConnection(val host: String, val port: Int) {
-    private val receiveMessageQueue = LinkedListChannel<Frame>()
-    private val sendMessageQueue = LinkedListChannel<Frame>()
-    private lateinit var closeStage: ConnectionStage
-    private lateinit var connection: AsynchronousSocketChannel
+    private val receiveQueue = LinkedListChannel<ServerFrame>()
+    private val sendQueue = LinkedListChannel<ClientFrame>()
+    private lateinit var socketChannel: AsynchronousSocketChannel
+    private var connStatus = ConnectionStatus.RUNNING
+    private lateinit var readsBuffer: ReadsBuffer
 
-    private var clientNotSendOverTime = false
-
-    private var pingTimes = 0
-
-    suspend fun connect(host: String): ClientConnection {
-        connection = AsynchronousSocketChannel.open()
-        connection.aConnect(InetSocketAddress(this.host, port))
-        closeStage = ConnectionStage.RUNNING
+    suspend fun connect() {
+        socketChannel.aConnect(InetSocketAddress(host, port))
+        readsBuffer = ReadsBuffer(socketChannel)
 
         val clientHttpHeader = HttpHeader.offerHttpHeader()
-        connection.aWrite(ByteBuffer.wrap(clientHttpHeader.getHeaderByteArray()))
-        val serverHttpHeader = HttpHeader.getHttpHeader(connection)
-        if (!serverHttpHeader.checkHttpHeader(clientHttpHeader.secWebSocketKey!!)) {
-            throw WebsocketException("secWebSocketAccept check failed")
-        }
+        socketChannel.aWrite(ByteBuffer.wrap(clientHttpHeader.getHeaderByteArray()))
 
-        async { readFrame() }
+        val serverHttpHeader = HttpHeader.getHttpHeader(readsBuffer)
 
-        async { writeFrame() }
-        return this
+        if (!serverHttpHeader.checkHttpHeader(clientHttpHeader.secWebSocketKey!!)) TODO("secWebSocketKey check failed")
+
+        async { receive() }
+        async { send() }
     }
 
-    suspend private fun readFrame() {
-        var lastData: ByteArray? = null
-        loop@ while (true) {
+    private suspend fun receive() {
+        while (true) {
             try {
-                val serverFrame = withTimeout(1000 * 300) {
-                    ServerFrame.receiveFrame(connection, lastData)
-                }
-                lastData = serverFrame.lastOneData
-                when (serverFrame.opcode) {
-                    0x1 -> TODO("opcode is 0x01, data is UTF-8 text")
+                val serverFrame = withTimeout(1000 * 60 * 5) { ServerFrame.receiveFrame(readsBuffer) }
 
-                    0x2 -> receiveMessageQueue.send(serverFrame)
+                when (serverFrame.frameType) {
+                    FrameType.BINARY -> receiveQueue.offer(serverFrame)
 
-                    0x3, 0x7, 0xB, 0xF -> TODO("MDN says it has no meaning")
-
-                    0x9 -> {
-                        val pongFrame = ClientFrame(0xA, serverFrame.content)
-                        sendMessageQueue.send(pongFrame)
+                    FrameType.PING -> {
+                        val pongFrame = ClientFrame(FrameType.PONG, "pong".toByteArray())
+                        sendQueue.offer(pongFrame)
                     }
 
-                    0xA -> {
-                        pingTimes = 0
-                    }
+                    FrameType.PONG -> connStatus = ConnectionStatus.RUNNING
 
-                // close frame
-                    0x8 -> {
-                        if (closeStage == ConnectionStage.CLOSING) {
-                            connection.shutdownInput()
-                            connection.close()
-                            closeStage = ConnectionStage.CLOSED
-                            break@loop
-                        } else {
-                            val closeFrame = ClientFrame(0x8, serverFrame.content)
-                            closeStage = ConnectionStage.BE_CLOSED
-                            sendMessageQueue.send(closeFrame)
-                            connection.shutdownInput()
-                            break@loop
-                        }
-                    }
+                    else -> TODO("receive other frame")
                 }
             } catch (e: TimeoutCancellationException) {
-                if (pingTimes >= 3) {
-                    close()
-                    break@loop
-                }
-
-                if (clientNotSendOverTime) {
-                    val pingFrame = ClientFrame(9, null)
-                    sendMessageQueue.send(pingFrame)
-                    pingTimes++
+                // start ping-pong handle
+                if (connStatus == ConnectionStatus.RUNNING) {
+                    val pingFrame = ClientFrame(FrameType.PING, "ping".toByteArray())
+                    sendQueue.offer(pingFrame)
+                    connStatus = ConnectionStatus.PING
+                } else {
+                    connStatus = ConnectionStatus.CLOSING
+                    closeConnection()
+                    break
                 }
             }
+
         }
     }
 
-    suspend private fun writeFrame() {
-        loop@ while (true) {
-            try {
-                val clientFrame = withTimeout(1000 * 300) {
-                    sendMessageQueue.receive()
-                }
-                when (clientFrame.opcode) {
-                    0x2 -> {
-                        connection.aWrite(ByteBuffer.wrap(clientFrame.content))
-                        clientNotSendOverTime = false
-                    }
-
-                    0x8 -> {
-                        if (closeStage == ConnectionStage.CLOSED) {
-                            connection.aWrite(ByteBuffer.wrap(clientFrame.content))
-                            connection.shutdownOutput()
-                            break@loop
-                        } else if (closeStage == ConnectionStage.BE_CLOSED) {
-                            connection.aWrite(ByteBuffer.wrap(clientFrame.content))
-                            connection.shutdownOutput()
-                            connection.close()
-                            closeStage = ConnectionStage.CLOSED
-                            break@loop
-                        }
-                    }
-
-                    0x9 -> {
-                        connection.aWrite(ByteBuffer.wrap(clientFrame.content))
-                        clientNotSendOverTime = true
-                    }
-                }
-            } catch (e: TimeoutCancellationException) {
-                clientNotSendOverTime = true
-            }
+    private suspend fun send() {
+        while (true) {
+            val clientFrame = sendQueue.receive()
+            socketChannel.aWrite(ByteBuffer.wrap(clientFrame.content))
         }
     }
 
-    suspend fun close() {
-        closeStage = ConnectionStage.CLOSING
-        val closeFrame = ClientFrame(0x8, null)
-        sendMessageQueue.send(closeFrame)
+    private fun closeConnection() {
+        receiveQueue.cancel()
+        sendQueue.cancel()
     }
 
-    suspend fun write(data: ByteArray) {
-        val clientFrame = ClientFrame(2, data)
-        sendMessageQueue.send(clientFrame)
+    suspend fun getFrame(): ServerFrame {
+        if (connStatus == ConnectionStatus.RUNNING) return receiveQueue.receive()
+        else throw WebsocketException("connection is closed")
     }
 
-    suspend fun read(): Frame {
-        return receiveMessageQueue.receive()
+    fun putFrame(data: ByteArray): Boolean {
+        if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(ClientFrame(FrameType.BINARY, data))
+        else throw WebsocketException("connection is closed")
     }
 }
