@@ -101,7 +101,7 @@ class HttpHeader {
             while (true) {
                 val line = readsBuffer.readLine()
                 sb.append(line)
-                if (line == "") {
+                if (line == "\r\n") {
                     return HttpHeader(sb.toString())
                 }
             }
