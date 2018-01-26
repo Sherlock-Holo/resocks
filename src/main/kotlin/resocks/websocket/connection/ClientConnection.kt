@@ -19,9 +19,13 @@ import java.nio.channels.AsynchronousSocketChannel
 class ClientConnection(val host: String, val port: Int) {
     private val receiveQueue = LinkedListChannel<ServerFrame>()
     private val sendQueue = LinkedListChannel<ClientFrame>()
+
     private lateinit var socketChannel: AsynchronousSocketChannel
-    private var connStatus = ConnectionStatus.RUNNING
     private lateinit var readsBuffer: ReadsBuffer
+
+    private var connStatus = ConnectionStatus.RUNNING
+
+    fun getConnStatus() = connStatus
 
     suspend fun connect() {
         socketChannel.aConnect(InetSocketAddress(host, port))
@@ -32,7 +36,7 @@ class ClientConnection(val host: String, val port: Int) {
 
         val serverHttpHeader = HttpHeader.getHttpHeader(readsBuffer)
 
-        if (!serverHttpHeader.checkHttpHeader(clientHttpHeader.secWebSocketKey!!)) TODO("secWebSocketKey check failed")
+        if (!clientHttpHeader.checkHttpHeader(serverHttpHeader.secWebSocketKey!!)) TODO("secWebSocketKey check failed")
 
         async { receive() }
         async { send() }
@@ -62,7 +66,6 @@ class ClientConnection(val host: String, val port: Int) {
                     sendQueue.offer(pingFrame)
                     connStatus = ConnectionStatus.PING
                 } else {
-                    connStatus = ConnectionStatus.CLOSING
                     closeConnection()
                     break
                 }
@@ -73,14 +76,23 @@ class ClientConnection(val host: String, val port: Int) {
 
     private suspend fun send() {
         while (true) {
-            val clientFrame = sendQueue.receive()
-            socketChannel.aWrite(ByteBuffer.wrap(clientFrame.content))
+            if (connStatus == ConnectionStatus.CLOSED) break
+
+            val clientFrame = sendQueue.receiveOrNull()
+            if (clientFrame != null) socketChannel.aWrite(ByteBuffer.wrap(clientFrame.content))
+            else break
         }
     }
 
     private fun closeConnection() {
+        connStatus = ConnectionStatus.CLOSED
+
         receiveQueue.cancel()
         sendQueue.cancel()
+
+        socketChannel.shutdownInput()
+        socketChannel.shutdownOutput()
+        socketChannel.close()
     }
 
     suspend fun getFrame(): ServerFrame {
