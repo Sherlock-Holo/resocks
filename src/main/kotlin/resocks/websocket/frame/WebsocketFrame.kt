@@ -6,7 +6,7 @@ import java.util.*
 import kotlin.experimental.xor
 
 class WebsocketFrame(override val frameType: FrameType, override val contentType: FrameContentType, data: ByteArray) : Frame {
-    override var opcode: Int = 1 shl 7
+    private var opcode: Int = 1 shl 7
     override val content: ByteArray
     override val frameByteArray: ByteArray
 
@@ -16,7 +16,7 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
         opcode = when (contentType) {
             FrameContentType.BINARY -> opcode or 0x2
 
-            FrameContentType.TEXT -> TODO("text frame")
+            FrameContentType.TEXT -> opcode or 0x1
 
             FrameContentType.PING -> opcode or 0x9
 
@@ -24,8 +24,10 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
 
             FrameContentType.CLOSE -> opcode or 0x8
         }
+
         val initPayloadLength: Int
         val payloadLength: Int
+
         when (frameType) {
             FrameType.CLIENT -> {
                 maskKey = ByteArray(4)
@@ -40,8 +42,8 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                         frameByteArray = ByteArray(2 + 4 + payloadLength)
 
                         val frameBuffer = ByteBuffer.wrap(frameByteArray)
-                        frameBuffer.put((1 shl 7 or opcode).toByte())
-                        frameBuffer.put((initPayloadLength.toByte()))
+                        frameBuffer.put(opcode.toByte())
+                        frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.put(maskKey)
                         frameBuffer.put(content)
                     }
@@ -53,8 +55,8 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                         frameByteArray = ByteArray(2 + 2 + 4 + payloadLength)
 
                         val frameBuffer = ByteBuffer.wrap(frameByteArray)
-                        frameBuffer.put((1 shl 7 or opcode).toByte())
-                        frameBuffer.put((initPayloadLength.toByte()))
+                        frameBuffer.put(opcode.toByte())
+                        frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.putShort(payloadLength.toShort())
                         frameBuffer.put(maskKey)
                         frameBuffer.put(content)
@@ -67,8 +69,8 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                         frameByteArray = ByteArray(2 + 8 + 4 + payloadLength)
 
                         val frameBuffer = ByteBuffer.wrap(frameByteArray)
-                        frameBuffer.put((1 shl 7 or opcode).toByte())
-                        frameBuffer.put((initPayloadLength.toByte()))
+                        frameBuffer.put(opcode.toByte())
+                        frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.putLong(payloadLength.toLong())
                         frameBuffer.put(maskKey)
                         frameBuffer.put(content)
@@ -88,8 +90,8 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                         frameByteArray = ByteArray(2 + payloadLength)
 
                         val frameBuffer = ByteBuffer.wrap(frameByteArray)
-                        frameBuffer.put((1 shl 7 or opcode).toByte())
-                        frameBuffer.put((initPayloadLength.toByte()))
+                        frameBuffer.put(opcode.toByte())
+                        frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.put(content)
                     }
                     data.size <= 65535 -> {
@@ -100,8 +102,8 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                         frameByteArray = ByteArray(2 + 2 + payloadLength)
 
                         val frameBuffer = ByteBuffer.wrap(frameByteArray)
-                        frameBuffer.put((1 shl 7 or opcode).toByte())
-                        frameBuffer.put((initPayloadLength.toByte()))
+                        frameBuffer.put(opcode.toByte())
+                        frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.putShort(payloadLength.toShort())
                         frameBuffer.put(content)
                     }
@@ -113,8 +115,8 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                         frameByteArray = ByteArray(2 + 8 + payloadLength)
 
                         val frameBuffer = ByteBuffer.wrap(frameByteArray)
-                        frameBuffer.put((1 shl 7 or opcode).toByte())
-                        frameBuffer.put((initPayloadLength.toByte()))
+                        frameBuffer.put(opcode.toByte())
+                        frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.putLong(payloadLength.toLong())
                         frameBuffer.put(content)
                     }
