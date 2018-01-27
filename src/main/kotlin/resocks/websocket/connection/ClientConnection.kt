@@ -25,7 +25,7 @@ class ClientConnection(val host: String, val port: Int) {
     private lateinit var readsBuffer: ReadsBuffer
 
     var connStatus = ConnectionStatus.RUNNING
-    private set
+        private set
 
     suspend fun connect() {
         socketChannel.aConnect(InetSocketAddress(host, port))
