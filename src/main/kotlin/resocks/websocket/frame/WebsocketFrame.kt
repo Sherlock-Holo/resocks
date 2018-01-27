@@ -127,7 +127,7 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
 
     companion object {
         suspend fun receiveFrame(readsBuffer: ReadsBuffer, frameType: FrameType): WebsocketFrame {
-            val frameHeader = readsBuffer.reads(2)
+            val frameHeader = readsBuffer.readExactly(2)
             val contentType: FrameContentType
 
             when (frameHeader[0].toInt()) {
@@ -163,13 +163,13 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                 }
 
                 initPayloadLength == 126 -> {
-//                    ByteUtils.byteArrayToShort(readsBuffer.reads(2)).toInt()
-                    ByteBuffer.wrap(readsBuffer.reads(2)).flip().short.toInt()
+//                    ByteUtils.byteArrayToShort(readsBuffer.readExactly(2)).toInt()
+                    ByteBuffer.wrap(readsBuffer.readExactly(2)).flip().short.toInt()
                 }
 
                 initPayloadLength == 127 -> {
-//                    ByteUtils.byteArrayToLong(readsBuffer.reads(8)).toInt()
-                    ByteBuffer.wrap(readsBuffer.reads(8)).flip().long.toInt()
+//                    ByteUtils.byteArrayToLong(readsBuffer.readExactly(8)).toInt()
+                    ByteBuffer.wrap(readsBuffer.readExactly(8)).flip().long.toInt()
                 }
 
                 else -> TODO("other initPayloadLength?")
@@ -177,13 +177,13 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
 
             when (frameType) {
                 FrameType.CLIENT -> {
-                    val maskKey = readsBuffer.reads(4)
-                    val data = readsBuffer.reads(payloadLength)
+                    val maskKey = readsBuffer.readExactly(4)
+                    val data = readsBuffer.readExactly(payloadLength)
                     return WebsocketFrame(frameType, contentType, mask(maskKey, data))
                 }
 
                 FrameType.SERVER -> {
-                    val data = readsBuffer.reads(payloadLength)
+                    val data = readsBuffer.readExactly(payloadLength)
                     return WebsocketFrame(frameType, contentType, data)
                 }
             }

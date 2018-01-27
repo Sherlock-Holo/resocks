@@ -8,7 +8,7 @@ class ReadsBuffer(val socketChannel: AsynchronousSocketChannel) {
     private val buffer = ByteBuffer.allocate(8192)
     private var bufferContentLength = 0
 
-    suspend fun reads(length: Int): ByteArray {
+    suspend fun readExactly(length: Int): ByteArray {
         while (bufferContentLength < length) {
             bufferContentLength += socketChannel.aRead(buffer)
         }
@@ -24,7 +24,7 @@ class ReadsBuffer(val socketChannel: AsynchronousSocketChannel) {
     suspend fun readLine(): String {
         val sb = StringBuilder()
         while (true) {
-            val char = reads(1)[0].toChar()
+            val char = readExactly(1)[0].toChar()
             sb.append(char)
             if (char == '\n') return sb.toString()
         }
