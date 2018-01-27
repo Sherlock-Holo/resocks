@@ -46,7 +46,7 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
                     FrameType.BINARY -> receiveQueue.offer(clientFrame)
 
                     FrameType.PING -> {
-                        val pongFrame = ServerFrame(FrameType.PONG, "pong".toByteArray())
+                        val pongFrame = ServerFrame(FrameType.PONG, clientFrame.content)
                         sendQueue.offer(pongFrame)
                     }
 
