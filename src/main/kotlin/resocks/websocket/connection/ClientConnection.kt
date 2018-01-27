@@ -24,9 +24,8 @@ class ClientConnection(val host: String, val port: Int) {
     private lateinit var socketChannel: AsynchronousSocketChannel
     private lateinit var readsBuffer: ReadsBuffer
 
-    private var connStatus = ConnectionStatus.RUNNING
-
-    fun getConnStatus() = connStatus
+    var connStatus = ConnectionStatus.RUNNING
+    private set
 
     suspend fun connect() {
         socketChannel.aConnect(InetSocketAddress(host, port))

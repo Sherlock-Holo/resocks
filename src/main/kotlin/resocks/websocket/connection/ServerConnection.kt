@@ -25,9 +25,8 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
 
     private val readsBuffer = ReadsBuffer(socketChannel)
 
-    private var connStatus = ConnectionStatus.RUNNING
-
-    fun getConnStatus() = connStatus
+    var connStatus = ConnectionStatus.RUNNING
+    private set
 
     private suspend fun accept() {
         val clientHttpHeader = HttpHeader.getHttpHeader(readsBuffer)
