@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
 class ReadsBuffer(val socketChannel: AsynchronousSocketChannel) {
-    private val buffer = ByteBuffer.allocate(8192)
+    val buffer = ByteBuffer.allocate(8192)
     private var bufferContentLength = 0
 
     suspend fun readExactly(length: Int): ByteArray {
