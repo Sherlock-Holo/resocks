@@ -1,6 +1,7 @@
 package resocks.readsBuffer
 
 import kotlinx.coroutines.experimental.nio.aRead
+import resocks.websocket.WebsocketException
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
@@ -10,7 +11,11 @@ class ReadsBuffer(val socketChannel: AsynchronousSocketChannel) {
 
     suspend fun readExactly(length: Int): ByteArray {
         while (bufferContentLength < length) {
-            bufferContentLength += socketChannel.aRead(buffer)
+            val readLength = socketChannel.aRead(buffer)
+            if (readLength > 0) bufferContentLength += readLength
+            else {
+                throw WebsocketException("unexpected end of stream")
+            }
         }
 
         val byteArray = ByteArray(length)
