@@ -6,7 +6,7 @@ import java.util.*
 import kotlin.experimental.xor
 
 class WebsocketFrame(override val frameType: FrameType, override val contentType: FrameContentType, data: ByteArray) : Frame {
-    private var opcode: Int = 1 shl 7
+    private var opcode = 1 shl 7
     override val content: ByteArray
     override val frameByteArray: ByteArray
 

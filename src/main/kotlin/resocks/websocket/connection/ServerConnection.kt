@@ -8,9 +8,10 @@ import kotlinx.coroutines.experimental.nio.aWrite
 import kotlinx.coroutines.experimental.withTimeout
 import resocks.readsBuffer.ReadsBuffer
 import resocks.websocket.WebsocketException
-import resocks.websocket.frame.ClientFrame
+import resocks.websocket.frame.Frame
+import resocks.websocket.frame.FrameContentType
 import resocks.websocket.frame.FrameType
-import resocks.websocket.frame.ServerFrame
+import resocks.websocket.frame.WebsocketFrame
 import resocks.websocket.http.HttpHeader
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
@@ -19,8 +20,8 @@ import java.nio.channels.AsynchronousSocketChannel
 
 class ServerConnection private constructor(private val socketChannel: AsynchronousSocketChannel) {
 
-    private val receiveQueue = LinkedListChannel<ClientFrame>()
-    private val sendQueue = LinkedListChannel<ServerFrame>()
+    private val receiveQueue = LinkedListChannel<Frame>()
+    private val sendQueue = LinkedListChannel<Frame>()
 
     private val readsBuffer = ReadsBuffer(socketChannel)
 
@@ -40,24 +41,24 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
     private suspend fun receive() {
         while (true) {
             try {
-                val clientFrame = withTimeout(1000 * 60 * 5) { ClientFrame.receiveFrame(readsBuffer) }
+                val clientFrame = withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.CLIENT) }
 
-                when (clientFrame.frameType) {
-                    FrameType.BINARY -> receiveQueue.offer(clientFrame)
+                when (clientFrame.contentType) {
+                    FrameContentType.BINARY -> receiveQueue.offer(clientFrame)
 
-                    FrameType.PING -> {
-                        val pongFrame = ServerFrame(FrameType.PONG, clientFrame.content)
+                    FrameContentType.PING -> {
+                        val pongFrame = WebsocketFrame(FrameType.SERVER, FrameContentType.PONG, clientFrame.content)
                         sendQueue.offer(pongFrame)
                     }
 
-                    FrameType.PONG -> connStatus = ConnectionStatus.RUNNING
+                    FrameContentType.PONG -> connStatus = ConnectionStatus.RUNNING
 
                     else -> TODO("other frame")
                 }
             } catch (e: TimeoutCancellationException) {
                 // start ping-pong handle
                 if (connStatus == ConnectionStatus.RUNNING) {
-                    val pingFrame = ServerFrame(FrameType.PING, "pong".toByteArray())
+                    val pingFrame = WebsocketFrame(FrameType.SERVER, FrameContentType.PING, "pong".toByteArray())
                     sendQueue.offer(pingFrame)
                     connStatus = ConnectionStatus.PING
                 } else {
@@ -78,13 +79,13 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
         }
     }
 
-    suspend fun getFrame(): ClientFrame {
+    suspend fun getFrame(): Frame {
         if (connStatus == ConnectionStatus.RUNNING) return receiveQueue.receive()
         else throw WebsocketException("connection is closed")
     }
 
     fun putFrame(data: ByteArray): Boolean {
-        if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(ServerFrame(FrameType.BINARY, data))
+        if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.SERVER, FrameContentType.BINARY, data))
         else throw WebsocketException("connection is closed")
     }
 
