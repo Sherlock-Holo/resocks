@@ -57,9 +57,6 @@ class HttpHeader {
         val headList = header.substring(0 until header.length - 2).split("\r\n")
 
         if (!headList[0].startsWith("GET")) return false
-        /*if (headList[2] != "Upgrade: websocket") return false
-        if (headList[3] != "Connection: Upgrade") return false
-        if (headList[5] != "Sec-WebSocket-Version: 13") return false*/
         if (!headList.contains("Upgrade: websocket")) return false
         if (!headList.contains("Connection: Upgrade")) return false
         if (!headList.contains("Sec-WebSocket-Version: 13")) return false
@@ -73,9 +70,6 @@ class HttpHeader {
         val headList = header.substring(0 until header.length - 2).split("\r\n")
 
         if (headList[0] != "HTTP/1.1 101 Switching Protocols") return false
-        /*if (headList[1] != "Upgrade: websocket") return false
-        if (headList[2] != "Connection: Upgrade") return false
-        if (headList[3] != "Sec-WebSocket-Accept: " + genSecWebSocketAccept(secWebSocketKey)) return false*/
         if (!headList.contains("Upgrade: websocket")) return false
         if (!headList.contains("Connection: Upgrade")) return false
         if (!headList.contains("Sec-WebSocket-Accept: " + genSecWebSocketAccept(secWebSocketKey))) return false
