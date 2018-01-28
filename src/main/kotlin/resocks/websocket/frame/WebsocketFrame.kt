@@ -132,25 +132,22 @@ class WebsocketFrame(
             val contentType: FrameContentType
 
             when (frameHeader[0].toInt() and 0xff) {
+            // text frame
+                1 shl 7 or 0x1 -> contentType = FrameContentType.TEXT
+
             // binary frame
-                1 shl 7 or 0x2 -> {
-                    contentType = FrameContentType.BINARY
-                }
+                1 shl 7 or 0x2 -> contentType = FrameContentType.BINARY
+
             // ping frame
-                1 shl 7 or 0x9 -> {
-                    contentType = FrameContentType.PING
-                }
+                1 shl 7 or 0x9 -> contentType = FrameContentType.PING
+
             // pong frame
-                1 shl 7 or 0xA -> {
-                    contentType = FrameContentType.PONG
-                }
+                1 shl 7 or 0xA -> contentType = FrameContentType.PONG
+
             // close frame
-                1 shl 7 or 0x8 -> {
-                    contentType = FrameContentType.CLOSE
-                }
-                else -> {
-                    TODO("other opcode?")
-                }
+                1 shl 7 or 0x8 -> contentType = FrameContentType.CLOSE
+
+                else -> TODO("other opcode?")
             }
 
             val initPayloadLength = when (frameType) {
@@ -164,12 +161,10 @@ class WebsocketFrame(
                 }
 
                 initPayloadLength == 126 -> {
-//                    ByteUtils.byteArrayToShort(readsBuffer.readExactly(2)).toInt()
                     ByteBuffer.wrap(readsBuffer.readExactly(2)).flip().short.toInt()
                 }
 
                 initPayloadLength == 127 -> {
-//                    ByteUtils.byteArrayToLong(readsBuffer.readExactly(8)).toInt()
                     ByteBuffer.wrap(readsBuffer.readExactly(8)).flip().long.toInt()
                 }
 
