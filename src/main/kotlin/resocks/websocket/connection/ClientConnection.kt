@@ -21,7 +21,7 @@ class ClientConnection(val host: String, val port: Int) {
     private val receiveQueue = LinkedListChannel<Frame>()
     private val sendQueue = LinkedListChannel<Frame>()
 
-    private lateinit var socketChannel: AsynchronousSocketChannel
+    private val socketChannel = AsynchronousSocketChannel.open()
     private lateinit var readsBuffer: ReadsBuffer
 
     var connStatus = ConnectionStatus.RUNNING
@@ -36,7 +36,7 @@ class ClientConnection(val host: String, val port: Int) {
 
         val serverHttpHeader = HttpHeader.getHttpHeader(readsBuffer)
 
-        if (!clientHttpHeader.checkHttpHeader(serverHttpHeader.secWebSocketKey!!)) TODO("secWebSocketKey check failed")
+        if (!serverHttpHeader.checkHttpHeader(clientHttpHeader.secWebSocketKey!!)) TODO("secWebSocketKey check failed")
 
         async { receive() }
         async { send() }
@@ -79,7 +79,7 @@ class ClientConnection(val host: String, val port: Int) {
             if (connStatus == ConnectionStatus.CLOSED) break
 
             val clientFrame = sendQueue.receiveOrNull()
-            if (clientFrame != null) socketChannel.aWrite(ByteBuffer.wrap(clientFrame.content))
+            if (clientFrame != null) socketChannel.aWrite(ByteBuffer.wrap(clientFrame.frameByteArray))
             else break
         }
     }

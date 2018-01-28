@@ -65,9 +65,13 @@ class HttpHeader {
     }
 
     fun checkHttpHeader(secWebSocketKey: String): Boolean {
-        // client checks server handshake
+        // client checks server handshake, but this function invoked by serverHttpHeader
 
         val headList = header.substring(0 until header.length - 2).split("\r\n")
+
+        /*headList.forEach {
+            println(it)
+        }*/
 
         if (headList[0] != "HTTP/1.1 101 Switching Protocols") return false
         if (!headList.contains("Upgrade: websocket")) return false

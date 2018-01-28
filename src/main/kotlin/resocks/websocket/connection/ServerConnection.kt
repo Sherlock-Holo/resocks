@@ -73,7 +73,7 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
             if (connStatus == ConnectionStatus.CLOSED) break
 
             val serverFrame = sendQueue.receiveOrNull()
-            if (serverFrame != null) socketChannel.aWrite(ByteBuffer.wrap(serverFrame.content))
+            if (serverFrame != null) socketChannel.aWrite(ByteBuffer.wrap(serverFrame.frameByteArray))
             else break
         }
     }
@@ -114,7 +114,7 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
             }
         }
 
-        suspend fun <T> start(port: Int, host: String, handle: suspend (connection: ServerConnection) -> T) {
+        suspend fun <T> start(host: String, port: Int, handle: suspend (connection: ServerConnection) -> T) {
             val server = AsynchronousServerSocketChannel.open().bind(InetSocketAddress(host, port))
             while (true) {
                 val client = server.aAccept()

@@ -5,12 +5,11 @@ import java.nio.ByteBuffer
 import java.util.*
 import kotlin.experimental.xor
 
-class WebsocketFrame(override val frameType: FrameType, override val contentType: FrameContentType, data: ByteArray) : Frame {
+class WebsocketFrame(
+        override val frameType: FrameType, override val contentType: FrameContentType, override val content: ByteArray,
+        private var maskKey: ByteArray? = null) : Frame {
     private var opcode = 1 shl 7
-    override val content: ByteArray
     override val frameByteArray: ByteArray
-
-    val maskKey: ByteArray?
 
     init {
         opcode = when (contentType) {
@@ -30,14 +29,17 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
 
         when (frameType) {
             FrameType.CLIENT -> {
-                maskKey = ByteArray(4)
-                Random().nextBytes(maskKey)
-                content = mask(maskKey, data)
+                if (maskKey == null) {
+                    maskKey = ByteArray(4)
+                    Random().nextBytes(maskKey)
+                }
+
+                val maskData = mask(maskKey!!, content)
 
                 when {
-                    data.size <= 125 -> {
-                        initPayloadLength = 1 shl 7 or data.size
-                        payloadLength = data.size
+                    content.size <= 125 -> {
+                        initPayloadLength = 1 shl 7 or content.size
+                        payloadLength = content.size
 
                         frameByteArray = ByteArray(2 + 4 + payloadLength)
 
@@ -45,12 +47,12 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                         frameBuffer.put(opcode.toByte())
                         frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.put(maskKey)
-                        frameBuffer.put(content)
+                        frameBuffer.put(maskData)
                     }
-                    data.size <= 65535 -> {
+                    content.size <= 65535 -> {
                         val tmp = ByteArray(2)
                         initPayloadLength = 1 shl 7 or 126
-                        payloadLength = ByteBuffer.wrap(tmp).putShort(data.size.toShort()).flip().short.toInt()
+                        payloadLength = ByteBuffer.wrap(tmp).putShort(content.size.toShort()).flip().short.toInt()
 
                         frameByteArray = ByteArray(2 + 2 + 4 + payloadLength)
 
@@ -64,7 +66,7 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                     else -> {
                         val tmp = ByteArray(8)
                         initPayloadLength = 1 shl 7 or 127
-                        payloadLength = ByteBuffer.wrap(tmp).putLong(data.size.toLong()).flip().long.toInt()
+                        payloadLength = ByteBuffer.wrap(tmp).putLong(content.size.toLong()).flip().long.toInt()
 
                         frameByteArray = ByteArray(2 + 8 + 4 + payloadLength)
 
@@ -80,11 +82,10 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
 
             FrameType.SERVER -> {
                 maskKey = null
-                content = data
 
                 when {
-                    data.size <= 125 -> {
-                        initPayloadLength = data.size
+                    content.size <= 125 -> {
+                        initPayloadLength = content.size
                         payloadLength = initPayloadLength
 
                         frameByteArray = ByteArray(2 + payloadLength)
@@ -94,10 +95,10 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                         frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.put(content)
                     }
-                    data.size <= 65535 -> {
+                    content.size <= 65535 -> {
                         val tmp = ByteArray(2)
                         initPayloadLength = 126
-                        payloadLength = ByteBuffer.wrap(tmp).putShort(data.size.toShort()).flip().short.toInt()
+                        payloadLength = ByteBuffer.wrap(tmp).putShort(content.size.toShort()).flip().short.toInt()
 
                         frameByteArray = ByteArray(2 + 2 + payloadLength)
 
@@ -110,7 +111,7 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                     else -> {
                         val tmp = ByteArray(8)
                         initPayloadLength = 127
-                        payloadLength = ByteBuffer.wrap(tmp).putLong(data.size.toLong()).flip().long.toInt()
+                        payloadLength = ByteBuffer.wrap(tmp).putLong(content.size.toLong()).flip().long.toInt()
 
                         frameByteArray = ByteArray(2 + 8 + payloadLength)
 
@@ -130,7 +131,7 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
             val frameHeader = readsBuffer.readExactly(2)
             val contentType: FrameContentType
 
-            when (frameHeader[0].toInt()) {
+            when (frameHeader[0].toInt() and 0xff) {
             // binary frame
                 1 shl 7 or 0x2 -> {
                     contentType = FrameContentType.BINARY
@@ -153,8 +154,8 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
             }
 
             val initPayloadLength = when (frameType) {
-                FrameType.CLIENT -> frameHeader[1].toInt() and 0x7F
-                FrameType.SERVER -> frameHeader[1].toInt()
+                FrameType.CLIENT -> frameHeader[1].toInt() and 0xff and 0x7F
+                FrameType.SERVER -> frameHeader[1].toInt() and 0xff
             }
 
             val payloadLength = when {
@@ -179,7 +180,7 @@ class WebsocketFrame(override val frameType: FrameType, override val contentType
                 FrameType.CLIENT -> {
                     val maskKey = readsBuffer.readExactly(4)
                     val data = readsBuffer.readExactly(payloadLength)
-                    return WebsocketFrame(frameType, contentType, mask(maskKey, data))
+                    return WebsocketFrame(frameType, contentType, mask(maskKey, data), maskKey)
                 }
 
                 FrameType.SERVER -> {
