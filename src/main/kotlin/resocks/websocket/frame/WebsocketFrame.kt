@@ -61,7 +61,7 @@ class WebsocketFrame(
                         frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.putShort(payloadLength.toShort())
                         frameBuffer.put(maskKey)
-                        frameBuffer.put(content)
+                        frameBuffer.put(maskData)
                     }
                     else -> {
                         val tmp = ByteArray(8)
@@ -75,7 +75,7 @@ class WebsocketFrame(
                         frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.putLong(payloadLength.toLong())
                         frameBuffer.put(maskKey)
-                        frameBuffer.put(content)
+                        frameBuffer.put(maskData)
                     }
                 }
             }
