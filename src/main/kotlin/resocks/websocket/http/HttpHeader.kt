@@ -8,7 +8,7 @@ import java.util.*
 class HttpHeader {
     private val header: String
     val secWebSocketKey: String?
-    val secWebSocketAccept: String?
+    private val secWebSocketAccept: String?
 
     private constructor(isClient: Boolean, value: String, host: String = "github.com") {
         val headerBuilder = StringBuilder()
@@ -65,13 +65,9 @@ class HttpHeader {
     }
 
     fun checkHttpHeader(secWebSocketKey: String): Boolean {
-        // client checks server handshake, but this function invoked by serverHttpHeader
+        // serverHttpHeader invoke this to check itself on client-end
 
         val headList = header.substring(0 until header.length - 2).split("\r\n")
-
-        /*headList.forEach {
-            println(it)
-        }*/
 
         if (headList[0] != "HTTP/1.1 101 Switching Protocols") return false
         if (!headList.contains("Upgrade: websocket")) return false
