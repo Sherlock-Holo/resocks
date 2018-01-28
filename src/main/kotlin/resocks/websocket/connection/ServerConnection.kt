@@ -43,7 +43,7 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
                 val clientFrame = withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.CLIENT) }
 
                 when (clientFrame.contentType) {
-                    FrameContentType.BINARY -> receiveQueue.offer(clientFrame)
+                    FrameContentType.TEXT, FrameContentType.BINARY -> receiveQueue.offer(clientFrame)
 
                     FrameContentType.PING -> {
                         val pongFrame = WebsocketFrame(FrameType.SERVER, FrameContentType.PONG, clientFrame.content)

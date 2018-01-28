@@ -48,7 +48,7 @@ class ClientConnection(val host: String, val port: Int) {
                 val serverFrame = withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.SERVER) }
 
                 when (serverFrame.contentType) {
-                    FrameContentType.BINARY -> receiveQueue.offer(serverFrame)
+                    FrameContentType.TEXT, FrameContentType.BINARY -> receiveQueue.offer(serverFrame)
 
                     FrameContentType.PING -> {
                         val pongFrame = WebsocketFrame(FrameType.CLIENT, FrameContentType.PONG, serverFrame.content)
