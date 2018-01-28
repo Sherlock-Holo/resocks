@@ -36,6 +36,8 @@ class WebsocketFrame(
 
                 val maskData = mask(maskKey!!, content)
 
+                val frameBuffer: ByteBuffer
+
                 when {
                     content.size <= 125 -> {
                         initPayloadLength = 1 shl 7 or content.size
@@ -43,11 +45,9 @@ class WebsocketFrame(
 
                         frameByteArray = ByteArray(2 + 4 + payloadLength)
 
-                        val frameBuffer = ByteBuffer.wrap(frameByteArray)
+                        frameBuffer = ByteBuffer.wrap(frameByteArray)
                         frameBuffer.put(opcode.toByte())
                         frameBuffer.put(initPayloadLength.toByte())
-                        frameBuffer.put(maskKey)
-                        frameBuffer.put(maskData)
                     }
                     content.size <= 65535 -> {
                         val tmp = ByteArray(2)
@@ -56,12 +56,10 @@ class WebsocketFrame(
 
                         frameByteArray = ByteArray(2 + 2 + 4 + payloadLength)
 
-                        val frameBuffer = ByteBuffer.wrap(frameByteArray)
+                        frameBuffer = ByteBuffer.wrap(frameByteArray)
                         frameBuffer.put(opcode.toByte())
                         frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.putShort(payloadLength.toShort())
-                        frameBuffer.put(maskKey)
-                        frameBuffer.put(maskData)
                     }
                     else -> {
                         val tmp = ByteArray(8)
@@ -70,14 +68,15 @@ class WebsocketFrame(
 
                         frameByteArray = ByteArray(2 + 8 + 4 + payloadLength)
 
-                        val frameBuffer = ByteBuffer.wrap(frameByteArray)
+                        frameBuffer = ByteBuffer.wrap(frameByteArray)
                         frameBuffer.put(opcode.toByte())
                         frameBuffer.put(initPayloadLength.toByte())
                         frameBuffer.putLong(payloadLength.toLong())
-                        frameBuffer.put(maskKey)
-                        frameBuffer.put(maskData)
                     }
                 }
+
+                frameBuffer.put(maskKey)
+                frameBuffer.put(maskData)
             }
 
             FrameType.SERVER -> {
