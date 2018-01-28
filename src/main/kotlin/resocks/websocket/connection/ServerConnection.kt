@@ -88,6 +88,17 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
         else throw WebsocketException("connection is closed")
     }
 
+    fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean {
+        when (contentType) {
+            FrameContentType.PING, FrameContentType.PONG, FrameContentType.CLOSE -> throw WebsocketException("not allow content type")
+            else -> {
+            }
+        }
+
+        if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.SERVER, contentType, data))
+        else throw WebsocketException("connection is closed")
+    }
+
 
     private fun closeConnection() {
         connStatus = ConnectionStatus.CLOSED
