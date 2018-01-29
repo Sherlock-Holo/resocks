@@ -1,3 +1,5 @@
 package resocks.websocket
 
-class WebsocketException(msg: String) : Throwable(msg)
+import resocks.ResocksException
+
+class WebsocketException(msg: String) : ResocksException(msg)

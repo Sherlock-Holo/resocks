@@ -1,3 +1,5 @@
 package resocks.proxy
 
-class ProxyException(reason: String) : Throwable(reason)
+import resocks.ResocksException
+
+class ProxyException(reason: String) : ResocksException(reason)
