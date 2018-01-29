@@ -7,7 +7,7 @@ class WebscoketConnectionPool(private val host: String, private val port: Int) {
     private val pool = ArrayList<WebsocketConnection>()
 
     suspend fun getCoon(): WebsocketConnection {
-        synchronized(this) {
+        synchronized(pool) {
             val iter = pool.iterator()
             while (iter.hasNext()) {
                 val clientConnection = iter.next()
@@ -17,7 +17,7 @@ class WebscoketConnectionPool(private val host: String, private val port: Int) {
                 }
             }
         }
-        
+
         val clientConnection = WebsocketConnection()
         clientConnection.connect()
         pool.add(clientConnection)
