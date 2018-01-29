@@ -1,10 +1,25 @@
 package resocks.proxy
 
+import resocks.ResocksException
 import resocks.websocket.connection.ClientConnection
 import resocks.websocket.connection.ConnectionStatus
 
-class WebscoketConnectionPool(private val host: String, private val port: Int) {
+class WebscoketConnectionPool {
+    private val host: String
+    private val port: Int
     private val pool = ArrayList<WebsocketConnection>()
+
+    constructor(host: String, port: Int) {
+        this.host = host
+        this.port = port
+    }
+
+    constructor(websocketAddress: String) {
+        if (!websocketAddress.startsWith("ws://")) throw ResocksException("websocketAddress should start with \"ws://\"")
+        val address = websocketAddress.removePrefix("ws://")
+        host = address.substring(0, address.lastIndexOf(':'))
+        port = address.substring(address.lastIndexOf(':') + 1, address.length).toInt()
+    }
 
     suspend fun getCoon(): WebsocketConnection {
         synchronized(pool) {
