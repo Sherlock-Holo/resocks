@@ -2,34 +2,26 @@ package resocks.proxy
 
 import resocks.websocket.connection.ClientConnection
 import resocks.websocket.connection.ConnectionStatus
-import java.util.concurrent.ConcurrentLinkedQueue
 
 class WebscoketConnectionPool(private val host: String, private val port: Int) {
-    private val pool = ConcurrentLinkedQueue<WebsocketConnection>()
-    private val saveQueue = ArrayList<WebsocketConnection>()
+    private val pool = ArrayList<WebsocketConnection>()
 
     suspend fun getCoon(): WebsocketConnection {
-        try {
-            while (true) {
-                val clientConnection = pool.poll()
-                saveQueue.add(clientConnection)
-                if (clientConnection.clientConnection.connStatus == ConnectionStatus.RUNNING && clientConnection.hasID()) {
-                    return clientConnection
+        synchronized(this) {
+            val iter = pool.iterator()
+            while (iter.hasNext()) {
+                val clientConnection = iter.next()
+                when {
+                    clientConnection.clientConnection.connStatus == ConnectionStatus.RUNNING && clientConnection.hasID() -> return clientConnection
+                    clientConnection.clientConnection.connStatus == ConnectionStatus.CLOSED -> iter.remove()
                 }
             }
-
-        } catch (e: IllegalStateException) {
-            val clientConnection = WebsocketConnection()
-            clientConnection.connect()
-            return clientConnection
-        } finally {
-            pool.addAll(saveQueue)
-            saveQueue.clear()
         }
-    }
-
-    fun putCoon(clientConnection: WebsocketConnection) {
-        if (clientConnection.clientConnection.connStatus == ConnectionStatus.RUNNING) pool.add(clientConnection)
+        
+        val clientConnection = WebsocketConnection()
+        clientConnection.connect()
+        pool.add(clientConnection)
+        return clientConnection
     }
 
     inner class WebsocketConnection {
@@ -42,6 +34,7 @@ class WebscoketConnectionPool(private val host: String, private val port: Int) {
 
         internal suspend fun connect() = clientConnection.connect()
 
+        @Synchronized
         fun getID(): Int {
             for (i in 0 until capacity) {
                 if (idPool[i]) {
