@@ -6,11 +6,13 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 class WebscoketConnectionPool(private val host: String, private val port: Int) {
     private val pool = ConcurrentLinkedQueue<WebsocketConnection>()
+    private val saveQueue = ArrayList<WebsocketConnection>()
 
     suspend fun getCoon(): WebsocketConnection {
         try {
             while (true) {
                 val clientConnection = pool.poll()
+                saveQueue.add(clientConnection)
                 if (clientConnection.clientConnection.connStatus == ConnectionStatus.RUNNING && clientConnection.hasID()) {
                     return clientConnection
                 }
@@ -20,6 +22,9 @@ class WebscoketConnectionPool(private val host: String, private val port: Int) {
             val clientConnection = WebsocketConnection()
             clientConnection.connect()
             return clientConnection
+        } finally {
+            pool.addAll(saveQueue)
+            saveQueue.clear()
         }
     }
 
@@ -35,7 +40,7 @@ class WebscoketConnectionPool(private val host: String, private val port: Int) {
 
         private val idPool = BooleanArray(capacity) { true }
 
-        suspend fun connect() = clientConnection.connect()
+        internal suspend fun connect() = clientConnection.connect()
 
         fun getID(): Int {
             for (i in 0 until capacity) {
@@ -59,6 +64,6 @@ class WebscoketConnectionPool(private val host: String, private val port: Int) {
             }
         }
 
-        fun hasID() = poolSize < capacity
+        internal fun hasID() = poolSize < capacity
     }
 }
