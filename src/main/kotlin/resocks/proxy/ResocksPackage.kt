@@ -18,8 +18,12 @@ class ResocksPackage(val id: Int, val control: PackageControl, val data: ByteArr
                 System.arraycopy(data, 0, packageByteArray, 1, data!!.size)
             }
 
-            PackageControl.CLOSE -> {
+            PackageControl.CLOSE1 -> {
                 header = header or 3
+            }
+
+            PackageControl.CLOSE2 -> {
+                header = header or 4
             }
         }
         packageByteArray[0] = header.toByte()
@@ -28,7 +32,8 @@ class ResocksPackage(val id: Int, val control: PackageControl, val data: ByteArr
     companion object {
         private val runningArray = IntArray(6) { (it + 1) or 1 }
         private val connectArray = IntArray(6) { (it + 1) or 2 }
-        private val closeArray = IntArray(6) { (it + 1) or 3 }
+        private val close1Array = IntArray(6) { (it + 1) or 3 }
+        private val close2Array = IntArray(6) { (it + 1) or 4 }
 
         fun makePackage(rawData: ByteArray): ResocksPackage {
             val header = rawData[0].toInt() and 0xff
@@ -43,14 +48,21 @@ class ResocksPackage(val id: Int, val control: PackageControl, val data: ByteArr
                     data = ByteArray(rawData.size - 1)
                     System.arraycopy(rawData, 1, data, 0, data.size)
                 }
+
                 in connectArray -> {
                     packageType = PackageControl.CONNECT
                     data = ByteArray(rawData.size - 1)
                     System.arraycopy(rawData, 1, data, 0, data.size)
                 }
-                in closeArray -> {
-                    packageType = PackageControl.CLOSE
+
+                in close1Array -> {
+                    packageType = PackageControl.CLOSE1
                 }
+
+                in close2Array -> {
+                    packageType = PackageControl.CLOSE2
+                }
+                
                 else -> throw ProxyException("error package header")
             }
 
