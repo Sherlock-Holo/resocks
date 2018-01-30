@@ -1,6 +1,8 @@
 package resocks.server
 
+import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.nio.aConnect
+import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
 import resocks.encrypt.Cipher
 import resocks.encrypt.CipherModes
@@ -66,6 +68,34 @@ class Server(private val port: Int, password: String, private val host: String? 
                     val address = InetSocketAddress(InetAddress.getByAddress(addr), port)
                     targetServer.aConnect(address)
                     pool.addCoon(id, targetServer)
+
+                    async {
+                        val buffer = ByteBuffer.allocate(8192)
+                        while (true) {
+                            if (targetServer.aRead(buffer) <= 0) {
+                                if (pool.hasConn(id)) {
+                                    targetServer.shutdownInput()
+                                    val close1Package = ResocksPackage(id, PackageControl.CLOSE1)
+                                    connection.putFrame(encryptCipher.encrypt(close1Package.packageByteArray))
+                                    break
+
+                                } else {
+                                    targetServer.shutdownInput()
+                                    val close2Package = ResocksPackage(id, PackageControl.CLOSE2)
+                                    connection.putFrame(encryptCipher.encrypt(close2Package.packageByteArray))
+                                    targetServer.close()
+                                    break
+                                }
+                            }
+
+                            buffer.flip()
+                            val data = ByteArray(buffer.limit())
+                            buffer.get(data)
+                            buffer.compact()
+                            val targetServerPackage = ResocksPackage(id, PackageControl.RUNNING, data)
+                            connection.putFrame(encryptCipher.encrypt(targetServerPackage.packageByteArray))
+                        }
+                    }
                 }
 
                 PackageControl.RUNNING -> {
@@ -76,12 +106,16 @@ class Server(private val port: Int, password: String, private val host: String? 
                 PackageControl.CLOSE1 -> {
                     val targetServer = pool.getConn(id)
                     targetServer.shutdownOutput()
-                    val close2Package = ResocksPackage(id, PackageControl.CLOSE2)
-                    connection.putFrame(close2Package.packageByteArray)
+                    pool.removeConn(id)
+                }
+
+                PackageControl.CLOSE2 -> {
+                    val targetServer = pool.getConn(id)
+                    targetServer.shutdownOutput()
+                    pool.removeConn(id)
+                    targetServer.close()
                 }
             }
         }
     }
-
-    private suspend fun connectHandle
 }
