@@ -1,6 +1,8 @@
 package resocks.proxy
 
 import resocks.ResocksException
+import resocks.encrypt.Cipher
+import resocks.encrypt.CipherModes
 import resocks.websocket.connection.ClientConnection
 import resocks.websocket.connection.ConnectionStatus
 
@@ -9,16 +11,20 @@ class WebscoketConnectionPool {
     private val port: Int
     private val pool = ArrayList<WebsocketConnection>()
 
-    constructor(host: String, port: Int) {
+    private val key: ByteArray
+
+    constructor(host: String, port: Int, key: ByteArray) {
         this.host = host
         this.port = port
+        this.key = key
     }
 
-    constructor(websocketAddress: String) {
+    constructor(websocketAddress: String, key: ByteArray) {
         if (!websocketAddress.startsWith("ws://")) throw ResocksException("websocketAddress should start with \"ws://\"")
         val address = websocketAddress.removePrefix("ws://")
         host = address.substring(0, address.lastIndexOf(':'))
         port = address.substring(address.lastIndexOf(':') + 1, address.length).toInt()
+        this.key = key
     }
 
     suspend fun getCoon(): WebsocketConnection {
@@ -43,11 +49,22 @@ class WebscoketConnectionPool {
         private val capacity = 6
         private var poolSize = 0
 
+        private val encryptCipher = Cipher(CipherModes.AES_256_CTR, key)
+        private lateinit var decryptCipher: Cipher
+
         val clientConnection = ClientConnection(host, port)
 
         private val idPool = BooleanArray(capacity) { true }
 
-        internal suspend fun connect() = clientConnection.connect()
+        fun encrypt(plainData: ByteArray) = encryptCipher.encrypt(plainData)
+
+        fun decrypt(cipherData: ByteArray) = decryptCipher.decrypt(cipherData)
+
+        internal suspend fun connect() {
+            clientConnection.connect()
+            clientConnection.putFrame(encryptCipher.IVorNonce!!)
+            decryptCipher = Cipher(CipherModes.AES_256_CTR, key, clientConnection.getFrame().content)
+        }
 
         @Synchronized
         fun getID(): Int {
