@@ -14,6 +14,7 @@ import resocks.websocket.frame.FrameType
 import resocks.websocket.frame.WebsocketFrame
 import resocks.websocket.http.HttpHeader
 import java.net.InetSocketAddress
+import java.net.StandardSocketOptions
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
@@ -114,8 +115,10 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
     companion object {
         suspend fun <T> start(port: Int, handle: suspend (connection: ServerConnection) -> T) {
             val server = AsynchronousServerSocketChannel.open().bind(InetSocketAddress(port))
+            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
             while (true) {
                 val client = server.aAccept()
+                client.setOption(StandardSocketOptions.TCP_NODELAY, true)
                 val connection = ServerConnection(client)
 
                 async {
@@ -127,8 +130,10 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
 
         suspend fun <T> start(host: String, port: Int, handle: suspend (connection: ServerConnection) -> T) {
             val server = AsynchronousServerSocketChannel.open().bind(InetSocketAddress(host, port))
+            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
             while (true) {
                 val client = server.aAccept()
+                client.setOption(StandardSocketOptions.TCP_NODELAY, true)
                 val connection = ServerConnection(client)
 
                 async {
