@@ -3,13 +3,15 @@ package resocks.encrypt
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 
-class Cipher(key: ByteArray, iv: ByteArray? = null, cipherMode: CipherModes) {
+class Cipher(cipherMode: CipherModes, key: ByteArray, iv: ByteArray? = null) {
     private val inner: GeneralCipher
+    val IVorNonce: ByteArray?
 
     init {
         when (cipherMode) {
             CipherModes.AES_256_CTR -> {
                 inner = AES_256_CTR(key, iv)
+                IVorNonce = inner.getIVorNonce()
             }
         }
     }
@@ -24,7 +26,7 @@ class Cipher(key: ByteArray, iv: ByteArray? = null, cipherMode: CipherModes) {
 
     fun finish() = inner.finish()
 
-    fun getIVorNonce() = inner.getIVorNonce()
+//    fun getIVorNonce() = inner.getIVorNonce()
 
     companion object {
         fun password2key(passwd: String): ByteArray {
