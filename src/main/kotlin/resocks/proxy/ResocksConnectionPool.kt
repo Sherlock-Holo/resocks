@@ -25,5 +25,9 @@ class ResocksConnectionPool {
         pool[id] = socketChannel
     }
 
+    fun getConn(id: Int): AsynchronousSocketChannel {
+        return pool[id] ?: throw ProxyException("error id")
+    }
+
     fun remove(id: Int) = pool.remove(id)
 }
