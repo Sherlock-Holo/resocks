@@ -1,6 +1,6 @@
 package resocks.proxy
 
-class Package(val id: Int, val control: PackageControl, val data: ByteArray? = null) {
+class ResocksPackage(val id: Int, val control: PackageControl, val data: ByteArray? = null) {
     val packageByteArray =
             if (data != null) ByteArray(1 + data.size)
             else ByteArray(1)
@@ -30,7 +30,7 @@ class Package(val id: Int, val control: PackageControl, val data: ByteArray? = n
         private val connectArray = IntArray(6) { (it + 1) or 2 }
         private val closeArray = IntArray(6) { (it + 1) or 3 }
 
-        fun makePackage(rawData: ByteArray): Package {
+        fun makePackage(rawData: ByteArray): ResocksPackage {
             val header = rawData[0].toInt() and 0xff
             val id = header and 0xf0
 
@@ -54,7 +54,7 @@ class Package(val id: Int, val control: PackageControl, val data: ByteArray? = n
                 else -> throw ProxyException("error package header")
             }
 
-            return Package(id, packageType, data)
+            return ResocksPackage(id, packageType, data)
         }
     }
 }
