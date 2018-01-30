@@ -62,7 +62,7 @@ class ResocksPackage(val id: Int, val control: PackageControl, val data: ByteArr
                 in close2Array -> {
                     packageType = PackageControl.CLOSE2
                 }
-                
+
                 else -> throw ProxyException("error package header")
             }
 
