@@ -2,6 +2,7 @@ package resocks.client
 
 import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.nio.aAccept
+import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
 import resocks.encrypt.Cipher
 import resocks.proxy.PackageControl
@@ -9,7 +10,6 @@ import resocks.proxy.ProxyException
 import resocks.proxy.ResocksPackage
 import resocks.proxy.WebscoketConnectionPool
 import resocks.readsBuffer.ReadsBuffer
-import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.StandardSocketOptions
@@ -29,7 +29,7 @@ class Client(listenHost: String, listenPort: Int, password: String) {
         frontServer.setOption(StandardSocketOptions.TCP_NODELAY, true)
 //        frontServer.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
 
-        webscoketConnectionPool = WebscoketConnectionPool(host, port)
+        webscoketConnectionPool = WebscoketConnectionPool(host, port, key)
         while (true) {
             val client = frontServer.aAccept()
             client.setOption(StandardSocketOptions.TCP_NODELAY, true)
@@ -41,10 +41,11 @@ class Client(listenHost: String, listenPort: Int, password: String) {
         frontServer.setOption(StandardSocketOptions.TCP_NODELAY, true)
 //        frontServer.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
 
-        webscoketConnectionPool = WebscoketConnectionPool(websocketAddress)
+        webscoketConnectionPool = WebscoketConnectionPool(websocketAddress, key)
         while (true) {
             val client = frontServer.aAccept()
             client.setOption(StandardSocketOptions.TCP_NODELAY, true)
+            client.setOption(StandardSocketOptions.SO_KEEPALIVE, true)
             async { handle(client) }
         }
     }
@@ -111,7 +112,48 @@ class Client(listenHost: String, listenPort: Int, password: String) {
         val requestPackage = ResocksPackage(id, PackageControl.CONNECT, addrByteArray)
         connection.putFrame(websocketConnection.encrypt(requestPackage.packageByteArray))
 
-        val reply = byteArrayOf(5, 0, 0, 4) + Inet6Address.getByName("::1").address + port
+        val replyAddress = InetSocketAddress("::1", 0)
+        val reply = byteArrayOf(5, 0, 0, 4) + replyAddress.address.address + replyAddress.port.toByte()
         client.aWrite(ByteBuffer.wrap(reply))
+
+        websocketConnection.setConn(id, client)
+
+        async {
+            val buffer = readsBuffer.buffer
+            while (true) {
+                if (client.aRead(buffer) <= 0) {
+                    client.shutdownInput()
+
+                    if (websocketConnection.hasConn(id)) {
+                        val close1Package = ResocksPackage(id, PackageControl.CLOSE1)
+
+                        synchronized(connection) {
+                            connection.putFrame(websocketConnection.encrypt(close1Package.packageByteArray))
+                        }
+                        break
+
+                    } else {
+                        val close2Package = ResocksPackage(id, PackageControl.CLOSE2)
+
+                        synchronized(connection) {
+                            connection.putFrame(websocketConnection.encrypt(close2Package.packageByteArray))
+                        }
+                        client.close()
+                        break
+                    }
+                }
+
+                buffer.flip()
+                val data = ByteArray(buffer.limit())
+                buffer.get(data)
+                buffer.compact()
+
+                val resocksPackage = ResocksPackage(id, PackageControl.RUNNING, data)
+
+                synchronized(connection) {
+                    connection.putFrame(websocketConnection.encrypt(resocksPackage.packageByteArray))
+                }
+            }
+        }
     }
 }
