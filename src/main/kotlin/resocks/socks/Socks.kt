@@ -3,7 +3,6 @@ package resocks.socks
 import kotlinx.coroutines.experimental.nio.aWrite
 import resocks.readsBuffer.ReadsBuffer
 import java.net.InetAddress
-import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
