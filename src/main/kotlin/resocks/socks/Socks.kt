@@ -43,7 +43,7 @@ class Socks(private var socketChannel: AsynchronousSocketChannel) {
         val cmd = requestHeader[1].toInt() and 0xff
         val atyp = requestHeader[3].toInt() and 0xff
 
-        if (requestVersion != 5 || cmd != 0) throw SocksException("request error")
+        if (requestVersion != 5 || cmd != 1) throw SocksException("request error")
 
         when (atyp) {
             1 -> {
@@ -65,8 +65,10 @@ class Socks(private var socketChannel: AsynchronousSocketChannel) {
         serverPortByteArray = readsBuffer.readExactly(2)
         serverPort = ByteBuffer.wrap(serverPortByteArray).short.toInt()
 
-        val replyAddress = InetSocketAddress("::1", 0)
-        val reply = byteArrayOf(5, 0, 0, 4) + replyAddress.address.address + replyAddress.port.toByte()
+        val replyAddress = InetAddress.getByName("::1")
+        val replyPort = ByteArray(2)
+        ByteBuffer.wrap(replyPort).putShort(0)
+        val reply = byteArrayOf(5, 0, 0, 4) + replyAddress.address + replyPort
         socketChannel.aWrite(ByteBuffer.wrap(reply))
     }
 }
