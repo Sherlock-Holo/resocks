@@ -1,5 +1,5 @@
 package resocks.muxStream
 
-enum class PackageControl {
+enum class MuxPackageControl {
     CONNECT, RUNNING, CLOSE1, CLOSE2
 }
