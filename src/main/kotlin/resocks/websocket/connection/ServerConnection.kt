@@ -113,9 +113,11 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
     }
 
     companion object {
+        private val server = AsynchronousServerSocketChannel.open()
+
         suspend fun <T> start(port: Int, handle: suspend (connection: ServerConnection) -> T) {
-            val server = AsynchronousServerSocketChannel.open().bind(InetSocketAddress(port))
-            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
+            server.bind(InetSocketAddress(port))
+//            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
             while (true) {
                 val client = server.aAccept()
                 client.setOption(StandardSocketOptions.TCP_NODELAY, true)
@@ -129,8 +131,8 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
         }
 
         suspend fun <T> start(host: String, port: Int, handle: suspend (connection: ServerConnection) -> T) {
-            val server = AsynchronousServerSocketChannel.open().bind(InetSocketAddress(host, port))
-            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
+            server.bind(InetSocketAddress(host, port))
+//            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
             while (true) {
                 val client = server.aAccept()
                 client.setOption(StandardSocketOptions.TCP_NODELAY, true)
@@ -143,13 +145,18 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
             }
         }
 
-        private val server = AsynchronousServerSocketChannel.open()
 
         fun startServer(port: Int, host: String? = null) {
             if (host == null) server.bind(InetSocketAddress(port))
             else server.bind(InetSocketAddress(host, port))
+
+            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
         }
 
-        suspend fun getClient() = ServerConnection(server.aAccept())
+        suspend fun getClient(): ServerConnection {
+            val socketChannel = server.aAccept()
+            socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true)
+            return ServerConnection(socketChannel)
+        }
     }
 }
