@@ -9,7 +9,7 @@ import resocks.websocket.connection.ClientConnection
 import java.nio.ByteBuffer
 import java.util.concurrent.ConcurrentHashMap
 
-class LowLevelConnection(host: String, port: Int, private val key: ByteArray) {
+class ClientLowLevelConnection(host: String, port: Int, private val key: ByteArray) {
     private val websocketConnection = ClientConnection(host, port)
 
     private val muxPool = ConcurrentHashMap<Int, ClientMux>()

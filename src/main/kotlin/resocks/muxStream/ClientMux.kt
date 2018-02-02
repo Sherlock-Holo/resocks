@@ -12,7 +12,7 @@ class ClientMux(
         private val key: ByteArray
 ) {
 
-    private lateinit var llConn: LowLevelConnection
+    private lateinit var llConn: ClientLowLevelConnection
     var id: Int? = null
 
     suspend fun init() {
@@ -34,16 +34,16 @@ class ClientMux(
     }
 
     companion object {
-        private val pool = ArrayList<LowLevelConnection>()
+        private val pool = ArrayList<ClientLowLevelConnection>()
 
-        suspend fun getLLConn(host: String, port: Int, key: ByteArray): LowLevelConnection {
-//            return pool.firstOrNull { !it.isFull() } ?: LowLevelConnection(host, port, key).connect()
-            var llConn: LowLevelConnection? = null
+        suspend fun getLLConn(host: String, port: Int, key: ByteArray): ClientLowLevelConnection {
+//            return pool.firstOrNull { !it.isFull() } ?: ClientLowLevelConnection(host, port, key).connect()
+            var llConn: ClientLowLevelConnection? = null
             synchronized(pool) {
                 llConn = pool.firstOrNull { !it.isFull() }
                 if (llConn != null) return llConn!!
                 else {
-                    llConn = LowLevelConnection(host, port, key)
+                    llConn = ClientLowLevelConnection(host, port, key)
                 }
             }
 
