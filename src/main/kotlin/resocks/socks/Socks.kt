@@ -6,8 +6,11 @@ import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
-class Socks(private var socketChannel: AsynchronousSocketChannel) {
+class Socks(val socketChannel: AsynchronousSocketChannel) {
     var version: Int? = null
+        private set
+
+    var atyp: Int? = null
         private set
 
     lateinit var addr: InetAddress
@@ -16,10 +19,10 @@ class Socks(private var socketChannel: AsynchronousSocketChannel) {
     var addrLength: Int? = null
         private set
 
-    var serverPort: Int? = null
+    var port: Int? = null
         private set
 
-    lateinit var serverPortByteArray: ByteArray
+    lateinit var portByteArray: ByteArray
         private set
 
     suspend fun init() {
@@ -40,7 +43,7 @@ class Socks(private var socketChannel: AsynchronousSocketChannel) {
         val requestHeader = readsBuffer.readExactly(4)
         val requestVersion = requestHeader[0].toInt() and 0xff
         val cmd = requestHeader[1].toInt() and 0xff
-        val atyp = requestHeader[3].toInt() and 0xff
+        atyp = requestHeader[3].toInt() and 0xff
 
         if (requestVersion != 5 || cmd != 1) throw SocksException("request error")
 
@@ -61,8 +64,8 @@ class Socks(private var socketChannel: AsynchronousSocketChannel) {
             else -> throw SocksException("error atyp")
         }
 
-        serverPortByteArray = readsBuffer.readExactly(2)
-        serverPort = ByteBuffer.wrap(serverPortByteArray).short.toInt()
+        portByteArray = readsBuffer.readExactly(2)
+        port = ByteBuffer.wrap(portByteArray).short.toInt()
 
         val replyAddress = InetAddress.getByName("::1")
         val replyPort = ByteArray(2)
