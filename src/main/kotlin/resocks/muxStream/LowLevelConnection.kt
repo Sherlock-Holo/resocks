@@ -21,7 +21,7 @@ class LowLevelConnection(host: String, port: Int, private val key: ByteArray) {
     private val encryptCipher = Cipher(CipherModes.AES_256_CTR, key)
     private lateinit var decryptCipher: Cipher
 
-    suspend fun connect(): LowLevelConnection {
+    suspend fun connect() {
         websocketConnection.connect()
 
         websocketConnection.putFrame(encryptCipher.IVorNonce!!)
@@ -29,20 +29,20 @@ class LowLevelConnection(host: String, port: Int, private val key: ByteArray) {
         decryptCipher = Cipher(CipherModes.AES_256_CTR, key, ivFrame.content)
 
         async { write1() }
-        async { read() }
-
-        return this
+        async { read1() }
     }
 
     fun isFull() = muxPoolSize < muxPoolCapacity
 
-    @Synchronized
     fun addMuxStream(clientMuxStream: ClientMuxStream): Int {
-        val id: Int = (0 until 6).first { !muxPool.containsKey(it) }
+        var id: Int? = null
+        synchronized(muxPool) {
+            id = (0 until 6).first { !muxPool.containsKey(it) }
 
-        muxPool[id] = clientMuxStream
-        muxPoolSize += 1
-        return id
+            muxPool[id!!] = clientMuxStream
+            muxPoolSize += 1
+        }
+        return id!!
     }
 
     fun removeMuxStream(id: Int) {
@@ -65,10 +65,11 @@ class LowLevelConnection(host: String, port: Int, private val key: ByteArray) {
         sendQueue.offer(muxPackage)
     }
 
-    private suspend fun read() {
+    private suspend fun read1() {
         while (true) {
             val frame = websocketConnection.getFrame()
             val muxPackage = MuxPackage.makePackage(decryptCipher.decrypt(frame.content))
+
             if (muxPool.containsKey(muxPackage.id)) {
                 val clientSocketChannel = muxPool[muxPackage.id]!!
                 clientSocketChannel.socksSocketChannel.aWrite(ByteBuffer.wrap(muxPackage.data))

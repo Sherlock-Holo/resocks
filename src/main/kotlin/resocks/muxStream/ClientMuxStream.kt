@@ -6,9 +6,12 @@ import java.nio.channels.AsynchronousSocketChannel
 import java.util.*
 
 class ClientMuxStream(
-        val socksSocketChannel: AsynchronousSocketChannel, private val host: String, private val port: Int, private val key: ByteArray
+        val socksSocketChannel: AsynchronousSocketChannel,
+        private val host: String,
+        private val port: Int,
+        private val key: ByteArray
 ) {
-    
+
     private lateinit var llConn: LowLevelConnection
     var id: Int? = null
 
@@ -19,14 +22,14 @@ class ClientMuxStream(
         val hostByteArray = InetAddress.getByName(host).address
 
         val portByteArray = ByteArray(2)
-        ByteBuffer.wrap(portByteArray).putShort(port.toShort()).flip()
+        ByteBuffer.wrap(portByteArray).putShort(port.toShort())
 
-        val muxPackage = MuxPackage(id!!, PackageControl.CONNECT, hostByteArray + portByteArray)
+        val muxPackage = MuxPackage(id!!, MuxPackageControl.CONNECT, hostByteArray + portByteArray)
         llConn.write(muxPackage)
     }
 
     fun write(data: ByteArray) {
-        val muxPackage = MuxPackage(id!!, PackageControl.RUNNING, data)
+        val muxPackage = MuxPackage(id!!, MuxPackageControl.RUNNING, data)
         llConn.write(muxPackage)
     }
 
@@ -35,14 +38,18 @@ class ClientMuxStream(
 
         suspend fun getLLConn(host: String, port: Int, key: ByteArray): LowLevelConnection {
 //            return pool.firstOrNull { !it.isFull() } ?: LowLevelConnection(host, port, key).connect()
-            var llConn = pool.firstOrNull { !it.isFull() }
-            return if (llConn != null) llConn
-            else {
-                llConn = LowLevelConnection(host, port, key)
-                llConn.connect()
-                pool.add(llConn)
-                llConn
+            var llConn: LowLevelConnection? = null
+            synchronized(pool) {
+                llConn = pool.firstOrNull { !it.isFull() }
+                if (llConn != null) return llConn!!
+                else {
+                    llConn = LowLevelConnection(host, port, key)
+                }
             }
+
+            llConn!!.connect()
+            pool.add(llConn!!)
+            return llConn!!
         }
     }
 }
