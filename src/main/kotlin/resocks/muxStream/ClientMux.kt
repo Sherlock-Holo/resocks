@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 import java.util.*
 
-class ClientMuxStream(
+class ClientMux(
         val socksSocketChannel: AsynchronousSocketChannel,
         private val host: String,
         private val port: Int,

@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
 class LowLevelConnection(host: String, port: Int, private val key: ByteArray) {
     private val websocketConnection = ClientConnection(host, port)
 
-    private val muxPool = ConcurrentHashMap<Int, ClientMuxStream>()
+    private val muxPool = ConcurrentHashMap<Int, ClientMux>()
     private val muxPoolCapacity = 6
     private var muxPoolSize = 0
 
@@ -34,12 +34,12 @@ class LowLevelConnection(host: String, port: Int, private val key: ByteArray) {
 
     fun isFull() = muxPoolSize < muxPoolCapacity
 
-    fun addMuxStream(clientMuxStream: ClientMuxStream): Int {
+    fun addMuxStream(clientMux: ClientMux): Int {
         var id: Int? = null
         synchronized(muxPool) {
             id = (0 until 6).first { !muxPool.containsKey(it) }
 
-            muxPool[id!!] = clientMuxStream
+            muxPool[id!!] = clientMux
             muxPoolSize += 1
         }
         return id!!
