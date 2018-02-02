@@ -142,5 +142,14 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
                 }
             }
         }
+
+        private val server = AsynchronousServerSocketChannel.open()
+
+        fun startServer(port: Int, host: String? = null) {
+            if (host == null) server.bind(InetSocketAddress(port))
+            else server.bind(InetSocketAddress(host, port))
+        }
+
+        suspend fun getClient() = ServerConnection(server.aAccept())
     }
 }
