@@ -156,7 +156,9 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
         suspend fun getClient(): ServerConnection {
             val socketChannel = server.aAccept()
             socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true)
-            return ServerConnection(socketChannel)
+            val serverConnection = ServerConnection(socketChannel)
+            serverConnection.accept()
+            return serverConnection
         }
     }
 }
