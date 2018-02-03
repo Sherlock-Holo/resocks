@@ -19,7 +19,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 
-class ServerConnection private constructor(private val socketChannel: AsynchronousSocketChannel) {
+class ServerConnection private constructor(private val socketChannel: AsynchronousSocketChannel) : WebsocketConnection {
 
     private val receiveQueue = LinkedListChannel<Frame>()
     private val sendQueue = LinkedListChannel<Frame>()
@@ -79,17 +79,17 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
         }
     }
 
-    suspend fun getFrame(): Frame {
+    override suspend fun getFrame(): Frame {
         if (connStatus == ConnectionStatus.RUNNING) return receiveQueue.receive()
         else throw WebsocketException("connection is closed")
     }
 
-    fun putFrame(data: ByteArray): Boolean {
+    override fun putFrame(data: ByteArray): Boolean {
         if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.SERVER, FrameContentType.BINARY, data))
         else throw WebsocketException("connection is closed")
     }
 
-    fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean {
+    override fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean {
         when (contentType) {
             FrameContentType.PING, FrameContentType.PONG, FrameContentType.CLOSE -> throw WebsocketException("not allow content type")
             else -> {
@@ -149,8 +149,6 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
         fun startServer(port: Int, host: String? = null) {
             if (host == null) server.bind(InetSocketAddress(port))
             else server.bind(InetSocketAddress(host, port))
-
-            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
         }
 
         suspend fun getClient(): ServerConnection {

@@ -17,7 +17,7 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
-class ClientConnection(val host: String, val port: Int) {
+class ClientConnection(val host: String, val port: Int) : WebsocketConnection {
     private val receiveQueue = LinkedListChannel<Frame>()
     private val sendQueue = LinkedListChannel<Frame>()
 
@@ -95,17 +95,17 @@ class ClientConnection(val host: String, val port: Int) {
         socketChannel.close()
     }
 
-    suspend fun getFrame(): Frame {
+    override suspend fun getFrame(): Frame {
         if (connStatus == ConnectionStatus.RUNNING) return receiveQueue.receive()
         else throw WebsocketException("connection is closed")
     }
 
-    fun putFrame(data: ByteArray): Boolean {
+    override fun putFrame(data: ByteArray): Boolean {
         if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.CLIENT, FrameContentType.BINARY, data))
         else throw WebsocketException("connection is closed")
     }
 
-    fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean {
+    override fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean {
         when (contentType) {
             FrameContentType.PING, FrameContentType.PONG, FrameContentType.CLOSE -> throw WebsocketException("not allow content type")
             else -> {
