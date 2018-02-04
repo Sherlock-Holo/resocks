@@ -25,6 +25,9 @@ class Socks(val socketChannel: AsynchronousSocketChannel) {
     lateinit var portByteArray: ByteArray
         private set
 
+    lateinit var targetAddress: ByteArray
+        private set
+
     suspend fun init() {
         val readsBuffer = ReadsBuffer(socketChannel)
 
@@ -50,15 +53,25 @@ class Socks(val socketChannel: AsynchronousSocketChannel) {
         when (atyp) {
             1 -> {
                 addr = InetAddress.getByAddress(readsBuffer.readExactly(4))
+
+                targetAddress = ByteArray(7)
+                System.arraycopy(addr.address, 0, targetAddress, 1, 4)
             }
 
             3 -> {
                 addrLength = readsBuffer.readExactly(1)[0].toInt() and 0xff
                 addr = InetAddress.getByAddress(readsBuffer.readExactly(addrLength!!))
+
+                targetAddress = ByteArray(1 + 1 + addrLength!! + 2)
+                targetAddress[1] = addrLength!!.toByte()
+                System.arraycopy(addr.address, 0, targetAddress, 2, addrLength!!)
             }
 
             4 -> {
                 addr = InetAddress.getByAddress(readsBuffer.readExactly(16))
+
+                targetAddress = ByteArray(19)
+                System.arraycopy(addr.address, 0, targetAddress, 1, 16)
             }
 
             else -> throw SocksException("error atyp")
@@ -66,6 +79,8 @@ class Socks(val socketChannel: AsynchronousSocketChannel) {
 
         portByteArray = readsBuffer.readExactly(2)
         port = ByteBuffer.wrap(portByteArray).short.toInt()
+
+        System.arraycopy(portByteArray, 0, targetAddress, targetAddress.size - 2, 2)
 
         val replyAddress = InetAddress.getByName("::1")
         val replyPort = ByteArray(2)
