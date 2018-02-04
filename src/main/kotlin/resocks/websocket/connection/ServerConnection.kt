@@ -26,8 +26,7 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
 
     private val readsBuffer = ReadsBuffer(socketChannel)
 
-    var connStatus = ConnectionStatus.RUNNING
-        private set
+    override var connStatus = ConnectionStatus.RUNNING
 
     private suspend fun accept() {
         val clientHttpHeader = HttpHeader.getHttpHeader(readsBuffer)
@@ -113,11 +112,16 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
     }
 
     companion object {
-        private val server = AsynchronousServerSocketChannel.open()
+        private lateinit var server: AsynchronousServerSocketChannel
+
+        var started = false
+            private set
 
         suspend fun <T> start(port: Int, handle: suspend (connection: ServerConnection) -> T) {
+            started = true
+
+            server = AsynchronousServerSocketChannel.open()
             server.bind(InetSocketAddress(port))
-//            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
             while (true) {
                 val client = server.aAccept()
                 client.setOption(StandardSocketOptions.TCP_NODELAY, true)
@@ -131,8 +135,10 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
         }
 
         suspend fun <T> start(host: String, port: Int, handle: suspend (connection: ServerConnection) -> T) {
+            started = true
+
+            server = AsynchronousServerSocketChannel.open()
             server.bind(InetSocketAddress(host, port))
-//            server.setOption(StandardSocketOptions.TCP_NODELAY, true)
             while (true) {
                 val client = server.aAccept()
                 client.setOption(StandardSocketOptions.TCP_NODELAY, true)
@@ -147,8 +153,17 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
 
 
         fun startServer(port: Int, host: String? = null) {
+            started = true
+
+            server = AsynchronousServerSocketChannel.open()
             if (host == null) server.bind(InetSocketAddress(port))
             else server.bind(InetSocketAddress(host, port))
+        }
+
+        fun startServer(serverSocketChannel: AsynchronousServerSocketChannel) {
+            started = true
+
+            server = serverSocketChannel
         }
 
         suspend fun getClient(): ServerConnection {

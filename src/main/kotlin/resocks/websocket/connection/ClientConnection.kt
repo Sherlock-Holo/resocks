@@ -24,8 +24,7 @@ class ClientConnection(val host: String, val port: Int) : WebsocketConnection {
     private val socketChannel = AsynchronousSocketChannel.open()
     private lateinit var readsBuffer: ReadsBuffer
 
-    var connStatus = ConnectionStatus.RUNNING
-        private set
+    override var connStatus = ConnectionStatus.RUNNING
 
     suspend fun connect() {
         socketChannel.aConnect(InetSocketAddress(host, port))
