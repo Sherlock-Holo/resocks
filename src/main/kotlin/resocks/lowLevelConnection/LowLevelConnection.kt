@@ -4,6 +4,7 @@ import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.channels.LinkedListChannel
 import resocks.encrypt.Cipher
 import resocks.encrypt.CipherModes
+import resocks.mux2.MuxException
 import resocks.mux2.MuxPackage
 import resocks.websocket.connection.ClientConnection
 import resocks.websocket.connection.ConnectionStatus
@@ -18,14 +19,16 @@ class LowLevelConnection {
     lateinit var decryptCipher: Cipher
         private set
 
-    /*private lateinit var clientConnection: ClientConnection
-    private lateinit var serverConnection: ServerConnection*/
-
     private lateinit var websocketConnection: WebsocketConnection
 
-    private val readQueueMap = ConcurrentHashMap<Int, LinkedListChannel<MuxPackage>>()
-    private val capacity = 6
     private var size = 0
+    private val capacity = 6
+
+    private val idPool = BooleanArray(capacity) { false }
+    private val readQueueMap = ConcurrentHashMap<Int, LinkedListChannel<MuxPackage>>()
+
+    private val writeQueue = LinkedListChannel<MuxPackage>()
+
 
     fun isFull() = size >= capacity
 
@@ -34,6 +37,13 @@ class LowLevelConnection {
             if (!readQueueMap.containsKey(id)) readQueueMap[id] = readDataQueue
         }
         size++
+    }
+
+    fun getID(): Int {
+        for (id in 0 until capacity) {
+            if (idPool[id]) return id
+        }
+        throw MuxException("no usable id")
     }
 
     private suspend fun read1() {
@@ -47,8 +57,25 @@ class LowLevelConnection {
         }
     }
 
+    private suspend fun write1() {
+        while (true) {
+            val muxPackage = writeQueue.receive()
+            websocketConnection.putFrame(encryptCipher.encrypt(muxPackage.packageByteArray))
+        }
+    }
+
+    suspend fun read(): MuxPackage {
+        val frame = websocketConnection.getFrame()
+        return MuxPackage.makePackage(decryptCipher.decrypt(frame.content))
+    }
+
     fun write(data: ByteArray) {
         websocketConnection.putFrame(encryptCipher.encrypt(data))
+    }
+
+    fun putPackage(muxPackageByteArray: ByteArray) {
+        val muxPackage = MuxPackage.makePackage(muxPackageByteArray)
+        writeQueue.offer(muxPackage)
     }
 
 
@@ -73,7 +100,6 @@ class LowLevelConnection {
             clientConnection.connect()
 
             val lowLevelConnection = LowLevelConnection()
-//            lowLevelConnection.clientConnection = clientConnection
             lowLevelConnection.websocketConnection = clientConnection
 
             lowLevelConnection.websocketConnection.putFrame(lowLevelConnection.encryptCipher.IVorNonce!!)
@@ -89,21 +115,25 @@ class LowLevelConnection {
         }
 
 
-        fun bind(addr: String, port: Int) {
+        fun bind(port: Int, addr: String? = null) {
             val serverSocketChannel = AsynchronousServerSocketChannel.open()
-            serverSocketChannel.bind(InetSocketAddress(addr, port))
+
+            if (addr != null) serverSocketChannel.bind(InetSocketAddress(addr, port))
+            else serverSocketChannel.bind(InetSocketAddress(port))
+
             ServerConnection.startServer(serverSocketChannel)
         }
 
         suspend fun accept(): LowLevelConnection {
             val serverConnection = ServerConnection.getClient()
             val lowLevelConnection = LowLevelConnection()
-//            lowLevelConnection.serverConnection = serverConnection
             lowLevelConnection.websocketConnection = serverConnection
 
             lowLevelConnection.websocketConnection.putFrame(lowLevelConnection.encryptCipher.IVorNonce!!)
             val frame = lowLevelConnection.websocketConnection.getFrame()
             lowLevelConnection.decryptCipher = Cipher(CipherModes.AES_256_CTR, key, frame.content)
+
+            async { lowLevelConnection.write1() }
             return lowLevelConnection
         }
     }

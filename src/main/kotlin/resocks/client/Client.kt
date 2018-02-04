@@ -38,6 +38,8 @@ class Client(bindAddr: String, bindPort: Int, private val proxyAddr: String, pri
     private suspend fun handle(socks: Socks) {
         val llConn = LowLevelConnection.connect(proxyAddr, proxyPort)
         val mux = Mux2(llConn.getID()) { llConn.write(it) }
+        llConn.setReadQueue(mux.id, mux.readQueue)
+
         val socksSocketChannel = socks.socketChannel
         mux.write(socks.targetAddress, MuxPackageControl.CONNECT)
 
