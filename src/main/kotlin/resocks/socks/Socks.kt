@@ -28,6 +28,9 @@ class Socks(val socketChannel: AsynchronousSocketChannel) {
     lateinit var targetAddress: ByteArray
         private set
 
+    var isSuccessful = false
+        private set
+
     suspend fun init() {
         val readsBuffer = ReadsBuffer(socketChannel)
 
@@ -87,5 +90,6 @@ class Socks(val socketChannel: AsynchronousSocketChannel) {
         ByteBuffer.wrap(replyPort).putShort(0)
         val reply = byteArrayOf(5, 0, 0, 4) + replyAddress.address + replyPort
         socketChannel.aWrite(ByteBuffer.wrap(reply))
+        isSuccessful = true
     }
 }
