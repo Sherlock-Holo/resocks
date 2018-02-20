@@ -23,7 +23,7 @@ class ConnectionPool(private val key: ByteArray, val port: Int, val host: String
                 if (pool.isEmpty()) {
                     val lowLevelConnection = LowLevelConnection.initClient(key, host!!, port)
                     lowLevelConnection.pool = this
-                    return lowLevelConnection
+                    lowLevelConnection
 
                 } else pool.removeAt(0)
 
@@ -31,8 +31,8 @@ class ConnectionPool(private val key: ByteArray, val port: Int, val host: String
                 if (pool.isEmpty()) {
                     val lowLevelConnection = LowLevelConnection.initServer(ServerWebsocketConnection.getClient(), key)
                     lowLevelConnection.pool = this
-                    return lowLevelConnection
-                    
+                    lowLevelConnection
+
                 } else pool.removeAt(0)
             }
         }

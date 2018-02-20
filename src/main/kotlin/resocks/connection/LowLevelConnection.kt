@@ -10,14 +10,31 @@ class LowLevelConnection private constructor() {
     private lateinit var websocketConnection: WebsocketConnection
     private lateinit var encryptCipher: Cipher
     private lateinit var decryptCipher: Cipher
+    lateinit var pool: ConnectionPool
+
+    var closeStatus = 0
 
     fun write(data: ByteArray) {
         websocketConnection.putFrame(encryptCipher.encrypt(data))
     }
 
-    suspend fun read(): ByteArray {
+    suspend fun read(): ByteArray? {
         val frame = websocketConnection.getFrame()
-        return decryptCipher.decrypt(frame.content)
+        val data = decryptCipher.decrypt(frame.content)
+        return if (data.contentEquals("close".toByteArray())) {
+            closeStatus++
+            null
+
+        } else data
+    }
+
+    fun release() {
+        pool.releaseConn(this)
+    }
+
+    fun sendClose() {
+        write("close".toByteArray())
+        closeStatus++
     }
 
     companion object {
@@ -46,7 +63,7 @@ class LowLevelConnection private constructor() {
 
             lowLevelConnection.encryptCipher = Cipher(CipherModes.AES_256_CTR, key)
             serverWebsocketConnection.putFrame(lowLevelConnection.encryptCipher.IVorNonce!!)
-            
+
             return lowLevelConnection
         }
     }
