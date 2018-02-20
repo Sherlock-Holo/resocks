@@ -10,7 +10,7 @@ class LowLevelConnection private constructor() {
     private lateinit var websocketConnection: WebsocketConnection
     private lateinit var encryptCipher: Cipher
     private lateinit var decryptCipher: Cipher
-    lateinit var pool: ConnectionPool
+    lateinit var pool: ClientConnectionPool
 
     var closeStatus = 0
 
