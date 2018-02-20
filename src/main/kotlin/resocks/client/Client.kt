@@ -80,6 +80,7 @@ class Client(
                     lowLevelConnection.write(data)
                 }
             } catch (e: IOException) {
+                e.printStackTrace()
             }
         }
 
@@ -107,6 +108,7 @@ class Client(
                     }
                 }
             } catch (e: IOException) {
+                e.printStackTrace()
             }
         }
     }

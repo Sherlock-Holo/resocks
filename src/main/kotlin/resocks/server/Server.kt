@@ -66,6 +66,7 @@ class Server(private val key: ByteArray,
                     socketChannel.aWrite(ByteBuffer.wrap(data))
                 }
             } catch (e: IOException) {
+                e.printStackTrace()
             }
         }
 
@@ -100,6 +101,7 @@ class Server(private val key: ByteArray,
                     lowLevelConnection.write(data)
                 }
             } catch (e: IOException) {
+                e.printStackTrace()
             }
         }
     }
