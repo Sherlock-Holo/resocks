@@ -6,6 +6,7 @@ import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
 import resocks.connection.LowLevelConnection
 import resocks.connection.ServerConnectionPoll
+import resocks.encrypt.Cipher
 import resocks.socks.Socks
 import java.io.IOException
 import java.net.InetAddress
@@ -13,10 +14,12 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
-class Server(private val key: ByteArray,
+class Server(password: String,
              private val listenPort: Int,
              private val listenAddr: String? = null
 ) {
+
+    private val key = Cipher.password2key(password)
 
     private lateinit var pool: ServerConnectionPoll
 
