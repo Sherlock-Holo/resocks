@@ -6,7 +6,7 @@ class ClientConnectionPool(private val key: ByteArray, val port: Int, val host: 
     suspend fun getConn(): LowLevelConnection {
         synchronized(pool) {
             return if (pool.isEmpty()) {
-                val lowLevelConnection = LowLevelConnection.initClient(key, host!!, port)
+                val lowLevelConnection = LowLevelConnection.initClient(key, host, port)
                 lowLevelConnection.pool = this
                 lowLevelConnection
 
