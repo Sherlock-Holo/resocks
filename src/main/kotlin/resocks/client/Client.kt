@@ -22,7 +22,7 @@ class Client(
 ) {
     private val key = Cipher.password2key(password)
     private val listenAsynchronousServerSocketChannel = AsynchronousServerSocketChannel.open()
-    private val lowLevelConnectionPool = ClientConnectionPool(key, serverPort, serverAddr, true)
+    private val lowLevelConnectionPool = ClientConnectionPool(key, serverPort, serverAddr)
 
     init {
         listenAsynchronousServerSocketChannel.bind(InetSocketAddress(listenAddr, listenPort))
