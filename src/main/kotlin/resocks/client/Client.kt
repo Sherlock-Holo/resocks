@@ -60,13 +60,12 @@ class Client(
                         lowLevelConnection.stopWrite()
 
                         when (lowLevelConnection.closeStatus) {
-                            0 -> {
+                            1 -> {
                                 return@async
                             }
 
-                            1 -> {
+                            2 -> {
                                 lowLevelConnection.release()
-                                socketChannel.shutdownOutput()
                                 socketChannel.close()
                                 return@async
                             }
