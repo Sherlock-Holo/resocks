@@ -92,4 +92,38 @@ class Socks(val socketChannel: AsynchronousSocketChannel) {
         socketChannel.aWrite(ByteBuffer.wrap(reply))
         isSuccessful = true
     }
+
+
+    companion object {
+        data class SocksInfo(val atyp: Int, val addr: ByteArray, val port: Int)
+
+        fun buildSocksInfo(targetAddress: ByteArray): SocksInfo {
+            val atyp = targetAddress[0].toInt() and 0xff
+
+            val addr: ByteArray
+            val port: Int
+
+            when (atyp) {
+                1 -> {
+                    addr = targetAddress.copyOfRange(1, 5)
+                    port = ByteBuffer.wrap(targetAddress.copyOfRange(5, 7)).short.toInt()
+
+                }
+
+                3 -> {
+                    val addrLength = targetAddress[1].toInt() and 0xff
+                    addr = targetAddress.copyOfRange(2, 2 + addrLength)
+                    port = ByteBuffer.wrap(targetAddress.copyOfRange(2 + addrLength, 4 + addrLength)).short.toInt()
+                }
+
+                4 -> {
+                    addr = targetAddress.copyOfRange(1, 17)
+                    port = ByteBuffer.wrap(targetAddress.copyOfRange(17, 19)).short.toInt()
+                }
+
+                else -> TODO()
+            }
+            return SocksInfo(atyp, addr, port)
+        }
+    }
 }
