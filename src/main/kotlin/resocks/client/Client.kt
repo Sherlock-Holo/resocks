@@ -4,7 +4,7 @@ import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.nio.aAccept
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
-import resocks.connection.ConnectionPool
+import resocks.connection.ClientConnectionPool
 import resocks.encrypt.Cipher
 import resocks.socks.Socks
 import java.io.IOException
@@ -22,7 +22,7 @@ class Client(
 ) {
     private val key = Cipher.password2key(password)
     private val listenAsynchronousServerSocketChannel = AsynchronousServerSocketChannel.open()
-    private val lowLevelConnectionPool = ConnectionPool(key, serverPort, serverAddr)
+    private val lowLevelConnectionPool = ClientConnectionPool(key, serverPort, serverAddr, true)
 
     init {
         listenAsynchronousServerSocketChannel.bind(InetSocketAddress(listenAddr, listenPort))
