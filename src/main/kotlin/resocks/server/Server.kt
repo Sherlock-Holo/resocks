@@ -17,8 +17,16 @@ class Server(private val key: ByteArray,
              private val listenPort: Int,
              private val listenAddr: String? = null
 ) {
-    
+
     private lateinit var pool: ServerConnectionPoll
+
+    suspend fun startServe() {
+        initPool()
+        while (true) {
+            val lowLevelConnection = accept()
+            async { handle(lowLevelConnection) }
+        }
+    }
 
     private suspend fun initPool() {
         pool = ServerConnectionPoll.buildPoll(key, listenPort, listenAddr)
@@ -26,7 +34,7 @@ class Server(private val key: ByteArray,
 
     private suspend fun accept() = pool.getConn()
 
-    suspend fun handle(lowLevelConnection: LowLevelConnection) {
+    private suspend fun handle(lowLevelConnection: LowLevelConnection) {
         val targetAddress = lowLevelConnection.read()!!
 
         val socksInfo = Socks.buildSocksInfo(targetAddress)
