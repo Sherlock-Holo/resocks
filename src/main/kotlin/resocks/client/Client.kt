@@ -57,7 +57,7 @@ class Client(
                     val length = socketChannel.aRead(buffer)
                     if (length <= 0) {
                         socketChannel.shutdownInput()
-                        lowLevelConnection.sendClose()
+                        lowLevelConnection.stopWrite()
 
                         when (lowLevelConnection.closeStatus) {
                             0 -> {
@@ -94,7 +94,7 @@ class Client(
 
                         when (lowLevelConnection.closeStatus) {
                             1 -> {
-
+                                return@async
                             }
 
                             2 -> {

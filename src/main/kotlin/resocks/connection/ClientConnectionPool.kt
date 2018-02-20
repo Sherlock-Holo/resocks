@@ -1,6 +1,6 @@
 package resocks.connection
 
-class ClientConnectionPool(private val key: ByteArray, val port: Int, val host: String) {
+class ClientConnectionPool(private val key: ByteArray, val port: Int, val host: String) : ConnectionPool {
     private val pool = ArrayList<LowLevelConnection>()
 
     suspend fun getConn(): LowLevelConnection {
@@ -14,7 +14,7 @@ class ClientConnectionPool(private val key: ByteArray, val port: Int, val host: 
         }
     }
 
-    fun releaseConn(lowLevelConnection: LowLevelConnection): Boolean {
+    override fun releaseConn(lowLevelConnection: LowLevelConnection): Boolean {
         synchronized(pool) {
             return pool.add(lowLevelConnection)
         }
