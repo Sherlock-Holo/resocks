@@ -10,7 +10,7 @@ class LowLevelConnection private constructor() {
     private lateinit var websocketConnection: WebsocketConnection
     private lateinit var encryptCipher: Cipher
     private lateinit var decryptCipher: Cipher
-    lateinit var pool: ClientConnectionPool
+    lateinit var pool: ConnectionPool
 
     var closeStatus = 0
 
@@ -32,7 +32,7 @@ class LowLevelConnection private constructor() {
         pool.releaseConn(this)
     }
 
-    fun sendClose() {
+    fun stopWrite() {
         write("close".toByteArray())
         closeStatus++
     }
