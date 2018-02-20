@@ -13,7 +13,11 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
-class Server(private val key: ByteArray, private val listenPort: Int, private val listenAddr: String? = null) {
+class Server(private val key: ByteArray,
+             private val listenPort: Int,
+             private val listenAddr: String? = null
+) {
+    
     private lateinit var pool: ServerConnectionPoll
 
     private suspend fun initPool() {
