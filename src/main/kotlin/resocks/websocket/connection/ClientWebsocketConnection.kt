@@ -17,7 +17,7 @@ import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
-class ClientConnection(val host: String, val port: Int) : WebsocketConnection {
+class ClientWebsocketConnection(val host: String, val port: Int) : WebsocketConnection {
     private val receiveQueue = LinkedListChannel<Frame>()
     private val sendQueue = LinkedListChannel<Frame>()
 

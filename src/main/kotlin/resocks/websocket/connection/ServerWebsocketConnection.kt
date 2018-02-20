@@ -19,7 +19,7 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 
-class ServerConnection private constructor(private val socketChannel: AsynchronousSocketChannel) : WebsocketConnection {
+class ServerWebsocketConnection private constructor(private val socketChannel: AsynchronousSocketChannel) : WebsocketConnection {
 
     private val receiveQueue = LinkedListChannel<Frame>()
     private val sendQueue = LinkedListChannel<Frame>()
@@ -111,13 +111,14 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
         socketChannel.close()
     }
 
+
     companion object {
         private lateinit var server: AsynchronousServerSocketChannel
 
         var started = false
             private set
 
-        suspend fun <T> start(port: Int, handle: suspend (connection: ServerConnection) -> T) {
+        suspend fun <T> start(port: Int, handle: suspend (websocketConnection: ServerWebsocketConnection) -> T) {
             started = true
 
             server = AsynchronousServerSocketChannel.open()
@@ -125,7 +126,7 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
             while (true) {
                 val client = server.aAccept()
                 client.setOption(StandardSocketOptions.TCP_NODELAY, true)
-                val connection = ServerConnection(client)
+                val connection = ServerWebsocketConnection(client)
 
                 async {
                     connection.accept()
@@ -134,7 +135,7 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
             }
         }
 
-        suspend fun <T> start(host: String, port: Int, handle: suspend (connection: ServerConnection) -> T) {
+        suspend fun <T> start(host: String, port: Int, handle: suspend (websocketConnection: ServerWebsocketConnection) -> T) {
             started = true
 
             server = AsynchronousServerSocketChannel.open()
@@ -142,7 +143,7 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
             while (true) {
                 val client = server.aAccept()
                 client.setOption(StandardSocketOptions.TCP_NODELAY, true)
-                val connection = ServerConnection(client)
+                val connection = ServerWebsocketConnection(client)
 
                 async {
                     connection.accept()
@@ -166,10 +167,10 @@ class ServerConnection private constructor(private val socketChannel: Asynchrono
             server = serverSocketChannel
         }
 
-        suspend fun getClient(): ServerConnection {
+        suspend fun getClient(): ServerWebsocketConnection {
             val socketChannel = server.aAccept()
             socketChannel.setOption(StandardSocketOptions.TCP_NODELAY, true)
-            val serverConnection = ServerConnection(socketChannel)
+            val serverConnection = ServerWebsocketConnection(socketChannel)
             serverConnection.accept()
             return serverConnection
         }
