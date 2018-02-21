@@ -55,7 +55,7 @@ class Client(
 
         lowLevelConnection.write(socks.targetAddress)
 
-//        println("send target address")
+        println("send target address")
 
         // client -> proxy server
         async {
@@ -63,27 +63,14 @@ class Client(
             val lastData = socks.readsBuffer.finishAndGetLastData()
             try {
                 if (lastData != null) {
-//                    println("send last data")
                     lowLevelConnection.write(lastData)
                 }
 
                 while (true) {
                     val length = socketChannel.aRead(buffer)
                     if (length <= 0) {
-                        socketChannel.shutdownInput()
-                        lowLevelConnection.stopWrite()
-
-                        when (lowLevelConnection.closeStatus) {
-                            1 -> {
-                                return@async
-                            }
-
-                            2 -> {
-                                socketChannel.close()
-                                lowLevelConnection.release()
-                                return@async
-                            }
-                        }
+                        lowLevelConnection.close()
+                        return@async
                     }
 
                     buffer.flip()
@@ -95,8 +82,10 @@ class Client(
 //                    println("send data")
                 }
             } catch (e: IOException) {
-                lowLevelConnection.errorStop()
+//                socketChannel.close()
+            } finally {
                 socketChannel.close()
+                lowLevelConnection.release()
             }
         }
 
@@ -104,28 +93,15 @@ class Client(
         async {
             try {
                 while (true) {
-                    val data = lowLevelConnection.read()
-                    if (data == null) {
-                        socketChannel.shutdownOutput()
-
-                        when (lowLevelConnection.closeStatus) {
-                            1 -> {
-                                return@async
-                            }
-
-                            2 -> {
-                                socketChannel.close()
-                                lowLevelConnection.release()
-                                return@async
-                            }
-                        }
-                    }
+                    val data = lowLevelConnection.read() ?: return@async
 
                     socketChannel.aWrite(ByteBuffer.wrap(data))
                 }
             } catch (e: IOException) {
-                lowLevelConnection.errorStop()
+//                e.printStackTrace()
+            } finally {
                 socketChannel.close()
+                lowLevelConnection.release()
             }
         }
     }

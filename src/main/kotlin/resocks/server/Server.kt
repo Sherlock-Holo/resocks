@@ -42,11 +42,10 @@ class Server(password: String,
         val targetAddress = try {
             lowLevelConnection.read()!!
         } catch (e: IOException) {
-            lowLevelConnection.errorStop()
-            return
+            TODO()
         }
 
-        println("receive targetAddress")
+//        println("receive targetAddress")
 
         val socksInfo = Socks.buildSocksInfo(targetAddress)
 //        println("atyp ${socksInfo.atyp}")
@@ -57,8 +56,7 @@ class Server(password: String,
         try {
             socketChannel.aConnect(InetSocketAddress(InetAddress.getByAddress(socksInfo.addr), socksInfo.port))
         } catch (e: IOException) {
-            lowLevelConnection.errorStop()
-            return
+            TODO()
         }
 
         println("start relay")
@@ -67,30 +65,14 @@ class Server(password: String,
         async {
             try {
                 while (true) {
-                    val data = lowLevelConnection.read()
+                    val data = lowLevelConnection.read() ?: return@async
 
-                    if (data == null) {
-                        socketChannel.shutdownOutput()
-
-                        when (lowLevelConnection.closeStatus) {
-                            1 -> {
-                                return@async
-                            }
-
-                            2 -> {
-                                socketChannel.close()
-                                lowLevelConnection.release()
-                                return@async
-                            }
-                        }
-                    }
-
-//                    println("data is not null")
                     socketChannel.aWrite(ByteBuffer.wrap(data))
                 }
             } catch (e: IOException) {
-                lowLevelConnection.errorStop()
+            } finally {
                 socketChannel.close()
+                lowLevelConnection.release()
             }
         }
 
@@ -101,20 +83,8 @@ class Server(password: String,
                 while (true) {
                     val length = socketChannel.aRead(buffer)
                     if (length <= 0) {
-                        socketChannel.shutdownInput()
-                        lowLevelConnection.stopWrite()
-
-                        when (lowLevelConnection.closeStatus) {
-                            1 -> {
-                                return@async
-                            }
-
-                            2 -> {
-                                socketChannel.close()
-                                lowLevelConnection.release()
-                                return@async
-                            }
-                        }
+                        lowLevelConnection.close()
+                        return@async
                     }
 
                     buffer.flip()
@@ -125,8 +95,11 @@ class Server(password: String,
                     lowLevelConnection.write(data)
                 }
             } catch (e: IOException) {
-                lowLevelConnection.errorStop()
+                /*lowLevelConnection.errorStop()
+                socketChannel.close()*/
+            } finally {
                 socketChannel.close()
+                lowLevelConnection.release()
             }
         }
     }

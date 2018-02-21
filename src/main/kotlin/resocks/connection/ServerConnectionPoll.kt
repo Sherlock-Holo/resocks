@@ -14,6 +14,7 @@ class ServerConnectionPoll : ConnectionPool {
     }
 
     override fun releaseConn(lowLevelConnection: LowLevelConnection): Boolean {
+        lowLevelConnection.isRelease = false
         return pool.offer(lowLevelConnection)
     }
 
@@ -26,7 +27,7 @@ class ServerConnectionPoll : ConnectionPool {
             async {
                 while (true) {
                     val serverWebsocketConnection = ServerWebsocketConnection.getClient()
-                    println("accept new websocket connection")
+//                    println("accept new websocket connection")
                     async {
                         val lowLevelConnection = LowLevelConnection.initServer(serverWebsocketConnection, key)
                         lowLevelConnection.pool = serverConnectionPoll

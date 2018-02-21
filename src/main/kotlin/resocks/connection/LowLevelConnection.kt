@@ -5,6 +5,7 @@ import resocks.encrypt.CipherModes
 import resocks.websocket.connection.ClientWebsocketConnection
 import resocks.websocket.connection.ServerWebsocketConnection
 import resocks.websocket.connection.WebsocketConnection
+import java.io.IOException
 
 class LowLevelConnection private constructor() {
     private lateinit var websocketConnection: WebsocketConnection
@@ -12,50 +13,50 @@ class LowLevelConnection private constructor() {
     private lateinit var decryptCipher: Cipher
     lateinit var pool: ConnectionPool
 
-    var closeStatus = 0
+    var socketIsClosed = false
+        private set
+
+    var isRelease = false
 
     fun write(data: ByteArray) {
-        websocketConnection.putFrame(encryptCipher.encrypt(data))
+        if (!socketIsClosed) websocketConnection.putFrame(encryptCipher.encrypt(data))
+
+        else throw IOException("lowLevelConnection is closed")
     }
 
     suspend fun read(): ByteArray? {
+        if (socketIsClosed) return null
+
         val frame = websocketConnection.getFrame()
         val data = decryptCipher.decrypt(frame.content)
 
-        when {
-            data.contentEquals("close".toByteArray()) -> {
-                println("receive close")
-                closeStatus++
-                return null
-            }
-
-            data.contentEquals("error".toByteArray()) -> {
-                println("error stop")
-                closeStatus = 2
-                return null
-            }
-
-            else -> {
-                return data
-            }
+        return if (data.contentEquals("close".toByteArray())) {
+            println("receive close")
+            socketIsClosed = true
+            null
+        } else {
+            data
         }
     }
 
     fun release() {
-        println("release")
-        pool.releaseConn(this)
+        /*if (!isRelease) pool.releaseConn(this)
+        else return*/
+        if (!isRelease) {
+            isRelease = true
+        } else {
+            println("release")
+            pool.releaseConn(this)
+        }
     }
 
-    fun stopWrite() {
+    fun close() {
         write("close".toByteArray())
-        closeStatus++
+
+        socketIsClosed = true
+
     }
 
-    fun errorStop() {
-        println("error stop")
-        write("error".toByteArray())
-        release()
-    }
 
     companion object {
         suspend fun initClient(key: ByteArray, host: String, port: Int): LowLevelConnection {
