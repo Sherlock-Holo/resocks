@@ -39,7 +39,13 @@ class Server(password: String,
     private suspend fun accept() = pool.getConn()
 
     private suspend fun handle(lowLevelConnection: LowLevelConnection) {
-        val targetAddress = lowLevelConnection.read()!!
+        val targetAddress = try {
+            lowLevelConnection.read()!!
+        } catch (e: IOException) {
+            lowLevelConnection.errorStop()
+            return
+        }
+
         println("receive targetAddress")
 
         val socksInfo = Socks.buildSocksInfo(targetAddress)
@@ -48,7 +54,12 @@ class Server(password: String,
 
         val socketChannel = AsynchronousSocketChannel.open()
 
-        socketChannel.aConnect(InetSocketAddress(InetAddress.getByAddress(socksInfo.addr), socksInfo.port))
+        try {
+            socketChannel.aConnect(InetSocketAddress(InetAddress.getByAddress(socksInfo.addr), socksInfo.port))
+        } catch (e: IOException) {
+            lowLevelConnection.errorStop()
+            return
+        }
 
         println("start relay")
 
@@ -57,9 +68,8 @@ class Server(password: String,
             try {
                 while (true) {
                     val data = lowLevelConnection.read()
-//                    println("proxy server get data")
+
                     if (data == null) {
-//                        println("data is null")
                         socketChannel.shutdownOutput()
 
                         when (lowLevelConnection.closeStatus) {
@@ -79,7 +89,8 @@ class Server(password: String,
                     socketChannel.aWrite(ByteBuffer.wrap(data))
                 }
             } catch (e: IOException) {
-                e.printStackTrace()
+                lowLevelConnection.errorStop()
+                socketChannel.close()
             }
         }
 
@@ -114,7 +125,8 @@ class Server(password: String,
                     lowLevelConnection.write(data)
                 }
             } catch (e: IOException) {
-                e.printStackTrace()
+                lowLevelConnection.errorStop()
+                socketChannel.close()
             }
         }
     }

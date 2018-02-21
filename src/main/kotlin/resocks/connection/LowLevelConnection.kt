@@ -21,14 +21,23 @@ class LowLevelConnection private constructor() {
     suspend fun read(): ByteArray? {
         val frame = websocketConnection.getFrame()
         val data = decryptCipher.decrypt(frame.content)
-        return if (data.contentEquals("close".toByteArray())) {
-            println("receive close")
-            closeStatus++
-            null
 
-        } else {
-//            println("read not null data")
-            data
+        when {
+            data.contentEquals("close".toByteArray()) -> {
+                println("receive close")
+                closeStatus++
+                return null
+            }
+
+            data.contentEquals("error".toByteArray()) -> {
+                println("error stop")
+                closeStatus = 2
+                return null
+            }
+
+            else -> {
+                return data
+            }
         }
     }
 
@@ -40,6 +49,12 @@ class LowLevelConnection private constructor() {
     fun stopWrite() {
         write("close".toByteArray())
         closeStatus++
+    }
+
+    fun errorStop() {
+        println("error stop")
+        write("error".toByteArray())
+        release()
     }
 
     companion object {

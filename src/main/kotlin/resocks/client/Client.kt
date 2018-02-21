@@ -39,19 +39,27 @@ class Client(
 
     private suspend fun handle(socketChannel: AsynchronousSocketChannel) {
         val socks = Socks(socketChannel)
-        socks.init()
+        try {
+            socks.init()
+        } catch (e: IOException) {
+            socketChannel.close()
+            return
+        }
 
-        if (!socks.isSuccessful) TODO()
+        if (!socks.isSuccessful) {
+            socketChannel.close()
+            return
+        }
 
         val lowLevelConnection = lowLevelConnectionPool.getConn()
 
         lowLevelConnection.write(socks.targetAddress)
 
-        println("send target address")
+//        println("send target address")
 
         // client -> proxy server
         async {
-            val buffer = ByteBuffer.allocate(8192)
+            val buffer = ByteBuffer.allocate(1024 * 16)
             val lastData = socks.readsBuffer.finishAndGetLastData()
             try {
                 if (lastData != null) {
@@ -71,8 +79,8 @@ class Client(
                             }
 
                             2 -> {
-                                lowLevelConnection.release()
                                 socketChannel.close()
+                                lowLevelConnection.release()
                                 return@async
                             }
                         }
@@ -87,7 +95,8 @@ class Client(
 //                    println("send data")
                 }
             } catch (e: IOException) {
-                e.printStackTrace()
+                lowLevelConnection.errorStop()
+                socketChannel.close()
             }
         }
 
@@ -110,12 +119,13 @@ class Client(
                                 return@async
                             }
                         }
-                    } else {
-                        socketChannel.aWrite(ByteBuffer.wrap(data))
                     }
+
+                    socketChannel.aWrite(ByteBuffer.wrap(data))
                 }
             } catch (e: IOException) {
-                e.printStackTrace()
+                lowLevelConnection.errorStop()
+                socketChannel.close()
             }
         }
     }
