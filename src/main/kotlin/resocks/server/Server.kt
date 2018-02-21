@@ -43,8 +43,8 @@ class Server(password: String,
         println("receive targetAddress")
 
         val socksInfo = Socks.buildSocksInfo(targetAddress)
-        println("atyp ${socksInfo.atyp}")
-        println(InetAddress.getByAddress(socksInfo.addr).hostAddress + " ${socksInfo.port}")
+//        println("atyp ${socksInfo.atyp}")
+//        println(InetAddress.getByAddress(socksInfo.addr).hostAddress + " ${socksInfo.port}")
 
         val socketChannel = AsynchronousSocketChannel.open()
 
@@ -57,9 +57,9 @@ class Server(password: String,
             try {
                 while (true) {
                     val data = lowLevelConnection.read()
-                    println("proxy server get data")
+//                    println("proxy server get data")
                     if (data == null) {
-                        println("data is null")
+//                        println("data is null")
                         socketChannel.shutdownOutput()
 
                         when (lowLevelConnection.closeStatus) {
@@ -75,7 +75,7 @@ class Server(password: String,
                         }
                     }
 
-                    println("data is not null")
+//                    println("data is not null")
                     socketChannel.aWrite(ByteBuffer.wrap(data))
                 }
             } catch (e: IOException) {

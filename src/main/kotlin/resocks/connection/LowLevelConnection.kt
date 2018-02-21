@@ -22,16 +22,18 @@ class LowLevelConnection private constructor() {
         val frame = websocketConnection.getFrame()
         val data = decryptCipher.decrypt(frame.content)
         return if (data.contentEquals("close".toByteArray())) {
+            println("receive close")
             closeStatus++
             null
 
         } else {
-            println("read not null data")
+//            println("read not null data")
             data
         }
     }
 
     fun release() {
+        println("release")
         pool.releaseConn(this)
     }
 

@@ -55,7 +55,7 @@ class Client(
             val lastData = socks.readsBuffer.finishAndGetLastData()
             try {
                 if (lastData != null) {
-                    println("send last data")
+//                    println("send last data")
                     lowLevelConnection.write(lastData)
                 }
 
@@ -77,7 +77,6 @@ class Client(
                             }
                         }
                     }
-                    println("send data")
 
                     buffer.flip()
                     val data = ByteArray(length)
@@ -85,6 +84,7 @@ class Client(
                     buffer.clear()
 
                     lowLevelConnection.write(data)
+//                    println("send data")
                 }
             } catch (e: IOException) {
                 e.printStackTrace()
