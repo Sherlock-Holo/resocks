@@ -6,8 +6,12 @@ import java.util.*
 import kotlin.experimental.xor
 
 class WebsocketFrame(
-        override val frameType: FrameType, override val contentType: FrameContentType, override val content: ByteArray,
-        private var maskKey: ByteArray? = null) : Frame {
+        override val frameType: FrameType,
+        override val contentType: FrameContentType,
+        override val content: ByteArray,
+        private var maskKey: ByteArray? = null
+) : Frame {
+
     private var opcode = 1 shl 7
     override val frameByteArray: ByteArray
 
@@ -160,11 +164,11 @@ class WebsocketFrame(
                 }
 
                 initPayloadLength == 126 -> {
-                    ByteBuffer.wrap(readsBuffer.readExactly(2)).flip().short.toInt()
+                    ByteBuffer.wrap(readsBuffer.readExactly(2)).short.toInt()
                 }
 
                 initPayloadLength == 127 -> {
-                    ByteBuffer.wrap(readsBuffer.readExactly(8)).flip().long.toInt()
+                    ByteBuffer.wrap(readsBuffer.readExactly(8)).long.toInt()
                 }
 
                 else -> TODO("other initPayloadLength?")
