@@ -41,6 +41,7 @@ class LowLevelConnection private constructor() {
         suspend fun initClient(key: ByteArray, host: String, port: Int): LowLevelConnection {
             val clientWebsocketConnection = ClientWebsocketConnection(host, port)
             clientWebsocketConnection.connect()
+//            println("create new client websocket connection")
 
             val lowLevelConnection = LowLevelConnection()
             lowLevelConnection.websocketConnection = clientWebsocketConnection
@@ -63,6 +64,8 @@ class LowLevelConnection private constructor() {
 
             lowLevelConnection.encryptCipher = Cipher(CipherModes.AES_256_CTR, key)
             serverWebsocketConnection.putFrame(lowLevelConnection.encryptCipher.IVorNonce!!)
+
+//            println("lowLevelConnection handshake finished")
 
             return lowLevelConnection
         }

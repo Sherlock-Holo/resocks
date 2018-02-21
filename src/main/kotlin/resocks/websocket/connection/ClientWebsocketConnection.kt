@@ -37,6 +37,8 @@ class ClientWebsocketConnection(val host: String, val port: Int) : WebsocketConn
 
         if (!serverHttpHeader.checkHttpHeader(clientHttpHeader.secWebSocketKey!!)) TODO("secWebSocketKey check failed")
 
+        println("websocket handshake finished")
+
         async { receive() }
         async { send() }
     }

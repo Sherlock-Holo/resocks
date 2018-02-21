@@ -35,9 +35,7 @@ class Client(
         }
     }
 
-    private suspend fun accept(): AsynchronousSocketChannel {
-        return listenAsynchronousServerSocketChannel.aAccept()
-    }
+    private suspend fun accept() = listenAsynchronousServerSocketChannel.aAccept()
 
     private suspend fun handle(socketChannel: AsynchronousSocketChannel) {
         val socks = Socks(socketChannel)
@@ -48,6 +46,8 @@ class Client(
         val lowLevelConnection = lowLevelConnectionPool.getConn()
 
         lowLevelConnection.write(socks.targetAddress)
+
+        println("send target address")
 
         // client -> proxy server
         async {

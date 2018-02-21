@@ -83,6 +83,7 @@ class Socks(val socketChannel: AsynchronousSocketChannel) {
         portByteArray = readsBuffer.readExactly(2)
         port = ByteBuffer.wrap(portByteArray).short.toInt()
 
+        targetAddress[0] = atyp!!.toByte()
         System.arraycopy(portByteArray, 0, targetAddress, targetAddress.size - 2, 2)
 
         val replyAddress = InetAddress.getByName("::1")

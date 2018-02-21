@@ -27,6 +27,7 @@ class Server(password: String,
         initPool()
         while (true) {
             val lowLevelConnection = accept()
+//            println("accept new lowLevelConnection")
             async { handle(lowLevelConnection) }
         }
     }
@@ -39,10 +40,14 @@ class Server(password: String,
 
     private suspend fun handle(lowLevelConnection: LowLevelConnection) {
         val targetAddress = lowLevelConnection.read()!!
+        println("receive targetAddress")
 
         val socksInfo = Socks.buildSocksInfo(targetAddress)
+        println("atyp ${socksInfo.atyp}")
+        println(InetAddress.getByAddress(socksInfo.addr).hostAddress + " ${socksInfo.port}")
 
         val socketChannel = AsynchronousSocketChannel.open()
+
         socketChannel.aConnect(InetSocketAddress(InetAddress.getByAddress(socksInfo.addr), socksInfo.port))
 
         //proxy server -> server

@@ -26,9 +26,12 @@ class ServerConnectionPoll : ConnectionPool {
             async {
                 while (true) {
                     val serverWebsocketConnection = ServerWebsocketConnection.getClient()
-                    val lowLevelConnection = LowLevelConnection.initServer(serverWebsocketConnection, key)
-                    lowLevelConnection.pool = serverConnectionPoll
-                    serverConnectionPoll.addConn(lowLevelConnection)
+//                    println("accept new websocket connection")
+                    async {
+                        val lowLevelConnection = LowLevelConnection.initServer(serverWebsocketConnection, key)
+                        lowLevelConnection.pool = serverConnectionPoll
+                        serverConnectionPoll.addConn(lowLevelConnection)
+                    }
                 }
             }
 
