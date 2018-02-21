@@ -50,12 +50,16 @@ class Server(password: String,
 
         socketChannel.aConnect(InetSocketAddress(InetAddress.getByAddress(socksInfo.addr), socksInfo.port))
 
+        println("start relay")
+
         //proxy server -> server
         async {
             try {
                 while (true) {
                     val data = lowLevelConnection.read()
+                    println("proxy server get data")
                     if (data == null) {
+                        println("data is null")
                         socketChannel.shutdownOutput()
 
                         when (lowLevelConnection.closeStatus) {
@@ -71,6 +75,7 @@ class Server(password: String,
                         }
                     }
 
+                    println("data is not null")
                     socketChannel.aWrite(ByteBuffer.wrap(data))
                 }
             } catch (e: IOException) {

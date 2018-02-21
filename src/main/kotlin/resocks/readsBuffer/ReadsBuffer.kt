@@ -34,4 +34,15 @@ class ReadsBuffer(val socketChannel: AsynchronousSocketChannel) {
             if (char == '\n') return sb.toString()
         }
     }
+
+    fun finishAndGetLastData(): ByteArray? {
+        buffer.flip()
+        val length = buffer.limit()
+        return if (length == 0) null
+        else {
+            val lastData = ByteArray(length)
+            buffer.get(lastData)
+            lastData
+        }
+    }
 }

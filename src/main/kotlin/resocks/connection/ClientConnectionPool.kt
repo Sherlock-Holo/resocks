@@ -18,7 +18,7 @@ class ClientConnectionPool(private val key: ByteArray, val port: Int, val host: 
 
         return if (pool.isEmpty()) {
             val lowLevelConnection = LowLevelConnection.initClient(key, host, port)
-            println("create new lowLevelConnection")
+//            println("create new lowLevelConnection")
             lowLevelConnection.pool = this
             lowLevelConnection
 

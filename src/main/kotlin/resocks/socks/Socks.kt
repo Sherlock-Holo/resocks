@@ -2,6 +2,7 @@ package resocks.socks
 
 import kotlinx.coroutines.experimental.nio.aWrite
 import resocks.readsBuffer.ReadsBuffer
+import java.net.Inet6Address
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
@@ -31,8 +32,10 @@ class Socks(val socketChannel: AsynchronousSocketChannel) {
     var isSuccessful = false
         private set
 
+    lateinit var readsBuffer: ReadsBuffer
+
     suspend fun init() {
-        val readsBuffer = ReadsBuffer(socketChannel)
+        readsBuffer = ReadsBuffer(socketChannel)
 
         version = readsBuffer.readExactly(1)[0].toInt() and 0xff
         if (version != 5) throw SocksException("socks version is not 5")
@@ -86,7 +89,7 @@ class Socks(val socketChannel: AsynchronousSocketChannel) {
         targetAddress[0] = atyp!!.toByte()
         System.arraycopy(portByteArray, 0, targetAddress, targetAddress.size - 2, 2)
 
-        val replyAddress = InetAddress.getByName("::1")
+        val replyAddress = Inet6Address.getByName("::1")
         val replyPort = ByteArray(2)
         ByteBuffer.wrap(replyPort).putShort(0)
         val reply = byteArrayOf(5, 0, 0, 4) + replyAddress.address + replyPort

@@ -25,7 +25,10 @@ class LowLevelConnection private constructor() {
             closeStatus++
             null
 
-        } else data
+        } else {
+            println("read not null data")
+            data
+        }
     }
 
     fun release() {

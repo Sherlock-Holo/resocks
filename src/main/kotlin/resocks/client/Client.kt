@@ -52,7 +52,13 @@ class Client(
         // client -> proxy server
         async {
             val buffer = ByteBuffer.allocate(8192)
+            val lastData = socks.readsBuffer.finishAndGetLastData()
             try {
+                if (lastData != null) {
+                    println("send last data")
+                    lowLevelConnection.write(lastData)
+                }
+
                 while (true) {
                     val length = socketChannel.aRead(buffer)
                     if (length <= 0) {
@@ -71,6 +77,7 @@ class Client(
                             }
                         }
                     }
+                    println("send data")
 
                     buffer.flip()
                     val data = ByteArray(length)
