@@ -16,7 +16,6 @@ class ClientConnectionPool(private val key: ByteArray, val port: Int, val host: 
     }
 
     override fun releaseConn(lowLevelConnection: LowLevelConnection): Boolean {
-        lowLevelConnection.isRelease = false
         return pool.add(lowLevelConnection)
     }
 }

@@ -5,7 +5,7 @@ import resocks.encrypt.CipherModes
 import resocks.websocket.connection.ClientWebsocketConnection
 import resocks.websocket.connection.ServerWebsocketConnection
 import resocks.websocket.connection.WebsocketConnection
-import java.io.IOException
+import java.nio.channels.AsynchronousSocketChannel
 
 class LowLevelConnection private constructor() {
     private lateinit var websocketConnection: WebsocketConnection
@@ -13,48 +13,45 @@ class LowLevelConnection private constructor() {
     private lateinit var decryptCipher: Cipher
     lateinit var pool: ConnectionPool
 
-    var socketIsClosed = false
-        private set
-
-    var isRelease = false
-
     fun write(data: ByteArray) {
-        if (!socketIsClosed) websocketConnection.putFrame(encryptCipher.encrypt(data))
-
-        else throw IOException("lowLevelConnection is closed")
+        websocketConnection.putFrame(encryptCipher.encrypt(data))
     }
 
     suspend fun read(): ByteArray? {
-        if (socketIsClosed) return null
+//        if (errorStatus) throw LowLevelConnectionException("socketChannel is error")
+//        if (finStatus) throw LowLevelConnectionException("socketChannel is close")
 
         val frame = websocketConnection.getFrame()
         val data = decryptCipher.decrypt(frame.content)
 
-        return if (data.contentEquals("close".toByteArray())) {
-            println("receive close")
-            socketIsClosed = true
-            null
-        } else {
-            data
+        return when {
+            data.contentEquals("writeFin".toByteArray()) -> {
+                println("receive fin")
+                null
+            }
+
+            data.contentEquals("error".toByteArray()) -> {
+                throw LowLevelConnectionException("receive error")
+            }
+
+            else -> data
         }
     }
 
-    fun release() {
-        /*if (!isRelease) pool.releaseConn(this)
-        else return*/
-        if (!isRelease) {
-            isRelease = true
-        } else {
-            println("release")
-            pool.releaseConn(this)
-        }
+    private fun release() {
+        pool.releaseConn(this)
     }
 
-    fun close() {
-        write("close".toByteArray())
+    fun writeFin(socketChannel: AsynchronousSocketChannel) {
+        write("writeFin".toByteArray())
 
-        socketIsClosed = true
+        socketChannel.close()
+        release()
+    }
 
+    fun readFin(socketChannel: AsynchronousSocketChannel) {
+        socketChannel.close()
+        release()
     }
 
 

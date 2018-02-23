@@ -57,6 +57,8 @@ class Client(
 
         println("send target address")
 
+        var llcCanUse = true
+
         // client -> proxy server
         async {
             val buffer = ByteBuffer.allocate(1024 * 16)
@@ -67,9 +69,15 @@ class Client(
                 }
 
                 while (true) {
+                    if (!llcCanUse) {
+                        return@async
+                    }
+
                     val length = socketChannel.aRead(buffer)
+
                     if (length <= 0) {
-                        lowLevelConnection.close()
+                        llcCanUse = false
+                        lowLevelConnection.writeFin(socketChannel)
                         return@async
                     }
 
@@ -79,13 +87,10 @@ class Client(
                     buffer.clear()
 
                     lowLevelConnection.write(data)
-//                    println("send data")
                 }
             } catch (e: IOException) {
-//                socketChannel.close()
-            } finally {
-                socketChannel.close()
-                lowLevelConnection.release()
+                llcCanUse = false
+                lowLevelConnection.writeFin(socketChannel)
             }
         }
 
@@ -93,15 +98,23 @@ class Client(
         async {
             try {
                 while (true) {
-                    val data = lowLevelConnection.read() ?: return@async
+                    if (!llcCanUse) {
+                        return@async
+                    }
+
+                    val data = lowLevelConnection.read()
+
+                    if (data == null) {
+                        llcCanUse = false
+                        lowLevelConnection.readFin(socketChannel)
+                        return@async
+                    }
 
                     socketChannel.aWrite(ByteBuffer.wrap(data))
                 }
             } catch (e: IOException) {
-//                e.printStackTrace()
-            } finally {
-                socketChannel.close()
-                lowLevelConnection.release()
+                llcCanUse = false
+                lowLevelConnection.writeFin(socketChannel)
             }
         }
     }

@@ -5,7 +5,7 @@ import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aRead
 import kotlinx.coroutines.experimental.nio.aWrite
 import resocks.connection.LowLevelConnection
-import resocks.connection.ServerConnectionPoll
+import resocks.connection.ServerConnectionPool
 import resocks.encrypt.Cipher
 import resocks.socks.Socks
 import java.io.IOException
@@ -21,7 +21,7 @@ class Server(password: String,
 
     private val key = Cipher.password2key(password)
 
-    private lateinit var pool: ServerConnectionPoll
+    private lateinit var pool: ServerConnectionPool
 
     suspend fun startServe() {
         initPool()
@@ -33,7 +33,7 @@ class Server(password: String,
     }
 
     private suspend fun initPool() {
-        pool = ServerConnectionPoll.buildPoll(key, listenPort, listenAddr)
+        pool = ServerConnectionPool.buildPoll(key, listenPort, listenAddr)
     }
 
     private suspend fun accept() = pool.getConn()
@@ -45,11 +45,8 @@ class Server(password: String,
             TODO()
         }
 
-//        println("receive targetAddress")
 
         val socksInfo = Socks.buildSocksInfo(targetAddress)
-//        println("atyp ${socksInfo.atyp}")
-//        println(InetAddress.getByAddress(socksInfo.addr).hostAddress + " ${socksInfo.port}")
 
         val socketChannel = AsynchronousSocketChannel.open()
 
@@ -61,18 +58,28 @@ class Server(password: String,
 
         println("start relay")
 
+        var llcCanUse = true
+
         //proxy server -> server
         async {
             try {
                 while (true) {
-                    val data = lowLevelConnection.read() ?: return@async
+                    if (!llcCanUse) {
+                        return@async
+                    }
+
+                    val data = lowLevelConnection.read()
+                    if (data == null) {
+                        llcCanUse = false
+                        lowLevelConnection.readFin(socketChannel)
+                        return@async
+                    }
 
                     socketChannel.aWrite(ByteBuffer.wrap(data))
                 }
             } catch (e: IOException) {
-            } finally {
-                socketChannel.close()
-                lowLevelConnection.release()
+                llcCanUse = false
+                lowLevelConnection.writeFin(socketChannel)
             }
         }
 
@@ -81,9 +88,14 @@ class Server(password: String,
             val buffer = ByteBuffer.allocate(1024 * 16)
             try {
                 while (true) {
+                    if (!llcCanUse) {
+                        return@async
+                    }
+
                     val length = socketChannel.aRead(buffer)
                     if (length <= 0) {
-                        lowLevelConnection.close()
+                        llcCanUse = false
+                        lowLevelConnection.writeFin(socketChannel)
                         return@async
                     }
 
@@ -95,11 +107,8 @@ class Server(password: String,
                     lowLevelConnection.write(data)
                 }
             } catch (e: IOException) {
-                /*lowLevelConnection.errorStop()
-                socketChannel.close()*/
-            } finally {
-                socketChannel.close()
-                lowLevelConnection.release()
+                llcCanUse = false
+                lowLevelConnection.writeFin(socketChannel)
             }
         }
     }

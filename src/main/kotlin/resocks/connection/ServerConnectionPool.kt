@@ -4,7 +4,7 @@ import kotlinx.coroutines.experimental.async
 import kotlinx.coroutines.experimental.channels.LinkedListChannel
 import resocks.websocket.connection.ServerWebsocketConnection
 
-class ServerConnectionPoll : ConnectionPool {
+class ServerConnectionPool : ConnectionPool {
     private val pool = LinkedListChannel<LowLevelConnection>()
 
     suspend fun getConn() = pool.receive()
@@ -14,14 +14,13 @@ class ServerConnectionPoll : ConnectionPool {
     }
 
     override fun releaseConn(lowLevelConnection: LowLevelConnection): Boolean {
-        lowLevelConnection.isRelease = false
         return pool.offer(lowLevelConnection)
     }
 
 
     companion object {
-        suspend fun buildPoll(key: ByteArray, port: Int, addr: String? = null): ServerConnectionPoll {
-            val serverConnectionPoll = ServerConnectionPoll()
+        suspend fun buildPoll(key: ByteArray, port: Int, addr: String? = null): ServerConnectionPool {
+            val serverConnectionPoll = ServerConnectionPool()
             ServerWebsocketConnection.startServer(port, addr)
 
             async {
