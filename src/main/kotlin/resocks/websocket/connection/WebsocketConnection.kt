@@ -8,7 +8,7 @@ interface WebsocketConnection {
 
     suspend fun getFrame(): Frame
 
-    fun putFrame(data: ByteArray): Boolean
+    suspend fun putFrame(data: ByteArray)
 
-    fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean
+    suspend fun putFrame(data: ByteArray, contentType: FrameContentType)
 }

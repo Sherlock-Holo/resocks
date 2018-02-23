@@ -1,13 +1,9 @@
 package resocks.websocket.connection
 
-import kotlinx.coroutines.experimental.TimeoutCancellationException
-import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.channels.LinkedListChannel
 import kotlinx.coroutines.experimental.nio.aConnect
 import kotlinx.coroutines.experimental.nio.aWrite
 import kotlinx.coroutines.experimental.withTimeout
 import resocks.readsBuffer.ReadsBuffer
-import resocks.websocket.WebsocketException
 import resocks.websocket.frame.Frame
 import resocks.websocket.frame.FrameContentType
 import resocks.websocket.frame.FrameType
@@ -18,9 +14,6 @@ import java.nio.ByteBuffer
 import java.nio.channels.AsynchronousSocketChannel
 
 class ClientWebsocketConnection(val host: String, val port: Int) : WebsocketConnection {
-    private val receiveQueue = LinkedListChannel<Frame>()
-    private val sendQueue = LinkedListChannel<Frame>()
-
     private val socketChannel = AsynchronousSocketChannel.open()
     private lateinit var readsBuffer: ReadsBuffer
 
@@ -39,11 +32,13 @@ class ClientWebsocketConnection(val host: String, val port: Int) : WebsocketConn
 
 //        println("websocket handshake finished")
 
-        async { receive() }
-        async { send() }
+        /*if (!directly) {
+            async { receive() }
+            async { send() }
+        }*/
     }
 
-    private suspend fun receive() {
+    /*private suspend fun receive() {
         while (true) {
             try {
                 val serverFrame = withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.SERVER) }
@@ -83,37 +78,24 @@ class ClientWebsocketConnection(val host: String, val port: Int) : WebsocketConn
             if (clientFrame != null) socketChannel.aWrite(ByteBuffer.wrap(clientFrame.frameByteArray))
             else break
         }
-    }
+    }*/
 
     private fun closeConnection() {
         connStatus = ConnectionStatus.CLOSED
 
-        receiveQueue.cancel()
-        sendQueue.cancel()
-
-        socketChannel.shutdownInput()
-        socketChannel.shutdownOutput()
         socketChannel.close()
     }
 
     override suspend fun getFrame(): Frame {
-        if (connStatus == ConnectionStatus.RUNNING) return receiveQueue.receive()
-        else throw WebsocketException("connection is closed")
+        return withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.SERVER) }
     }
 
-    override fun putFrame(data: ByteArray): Boolean {
-        if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.CLIENT, FrameContentType.BINARY, data))
-        else throw WebsocketException("connection is closed")
+    override suspend fun putFrame(data: ByteArray) {
+        putFrame(data, FrameContentType.BINARY)
     }
 
-    override fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean {
-        when (contentType) {
-            FrameContentType.PING, FrameContentType.PONG, FrameContentType.CLOSE -> throw WebsocketException("not allow content type")
-            else -> {
-            }
-        }
-
-        if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.CLIENT, contentType, data))
-        else throw WebsocketException("connection is closed")
+    override suspend fun putFrame(data: ByteArray, contentType: FrameContentType) {
+        val frame = WebsocketFrame(FrameType.CLIENT, contentType, data)
+        socketChannel.aWrite(ByteBuffer.wrap(frame.frameByteArray))
     }
 }

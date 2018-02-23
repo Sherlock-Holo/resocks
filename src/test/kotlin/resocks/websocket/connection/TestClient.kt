@@ -10,7 +10,7 @@ fun main(args: Array<String>) = runBlocking {
     val byteArray = FileInputStream("/tmp/randomfile").readAllBytes()
     println(byteArray.size)
     client.connect()
-    client.putFrame("sherlock".toByteArray(), FrameContentType.TEXT)
+    client.putFrame("sherlock".toByteArray())
     client.putFrame(byteArray)
     println(String(client.getFrame().content))
     println(String(client.getFrame().content))

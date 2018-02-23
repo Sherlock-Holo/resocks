@@ -1,14 +1,10 @@
 package resocks.websocket.connection
 
-import kotlinx.coroutines.experimental.TimeoutCancellationException
 import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.channels.LinkedListChannel
-import kotlinx.coroutines.experimental.channels.count
 import kotlinx.coroutines.experimental.nio.aAccept
 import kotlinx.coroutines.experimental.nio.aWrite
 import kotlinx.coroutines.experimental.withTimeout
 import resocks.readsBuffer.ReadsBuffer
-import resocks.websocket.WebsocketException
 import resocks.websocket.frame.Frame
 import resocks.websocket.frame.FrameContentType
 import resocks.websocket.frame.FrameType
@@ -22,9 +18,6 @@ import java.nio.channels.AsynchronousSocketChannel
 
 class ServerWebsocketConnection private constructor(private val socketChannel: AsynchronousSocketChannel) : WebsocketConnection {
 
-    private val receiveQueue = LinkedListChannel<Frame>()
-    private val sendQueue = LinkedListChannel<Frame>()
-
     private val readsBuffer = ReadsBuffer(socketChannel)
 
     override var connStatus = ConnectionStatus.RUNNING
@@ -34,11 +27,13 @@ class ServerWebsocketConnection private constructor(private val socketChannel: A
         val serverHttpHeader = HttpHeader.offerHttpHeader(clientHttpHeader.secWebSocketKey!!)
         socketChannel.aWrite(ByteBuffer.wrap(serverHttpHeader.getHeaderByteArray()))
 
-        async { receive() }
-        async { send() }
+        /*if (!directly) {
+            async { receive() }
+            async { send() }
+        }*/
     }
 
-    private suspend fun receive() {
+    /*private suspend fun receive() {
         while (true) {
             try {
                 val clientFrame = withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.CLIENT) }
@@ -77,38 +72,44 @@ class ServerWebsocketConnection private constructor(private val socketChannel: A
             if (serverFrame != null) socketChannel.aWrite(ByteBuffer.wrap(serverFrame.frameByteArray))
             else break
         }
-    }
+    }*/
 
-    override suspend fun getFrame(): Frame {
+    /*override suspend fun getFrame(): Frame {
         if (connStatus == ConnectionStatus.RUNNING) return receiveQueue.receive()
         else throw WebsocketException("connection is closed")
+    }*/
+
+    override suspend fun getFrame(): Frame {
+        val frame = withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.CLIENT) }
+        return frame
     }
 
-    override fun putFrame(data: ByteArray): Boolean {
-        if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.SERVER, FrameContentType.BINARY, data))
-        else throw WebsocketException("connection is closed")
-    }
+    override suspend fun putFrame(data: ByteArray) = putFrame(data, FrameContentType.BINARY)
 
-    override fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean {
+    /*override fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean {
         when (contentType) {
             FrameContentType.PING, FrameContentType.PONG, FrameContentType.CLOSE -> throw WebsocketException("not allow content type")
             else -> {
+                if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.SERVER, contentType, data))
+                else throw WebsocketException("connection is closed")
             }
         }
+    }*/
 
-        if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.SERVER, contentType, data))
-        else throw WebsocketException("connection is closed")
+    override suspend fun putFrame(data: ByteArray, contentType: FrameContentType) {
+        val frame = WebsocketFrame(FrameType.SERVER, contentType, data)
+        socketChannel.aWrite(ByteBuffer.wrap(frame.frameByteArray))
     }
 
 
     private fun closeConnection() {
         connStatus = ConnectionStatus.CLOSED
 
-        receiveQueue.cancel()
+        /*receiveQueue.cancel()
         sendQueue.cancel()
 
         socketChannel.shutdownInput()
-        socketChannel.shutdownOutput()
+        socketChannel.shutdownOutput()*/
         socketChannel.close()
     }
 
