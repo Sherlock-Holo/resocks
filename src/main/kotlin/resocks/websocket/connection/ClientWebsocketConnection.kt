@@ -29,56 +29,7 @@ class ClientWebsocketConnection(val host: String, val port: Int) : WebsocketConn
         val serverHttpHeader = HttpHeader.getHttpHeader(readsBuffer)
 
         if (!serverHttpHeader.checkHttpHeader(clientHttpHeader.secWebSocketKey!!)) TODO("secWebSocketKey check failed")
-
-//        println("websocket handshake finished")
-
-        /*if (!directly) {
-            async { receive() }
-            async { send() }
-        }*/
     }
-
-    /*private suspend fun receive() {
-        while (true) {
-            try {
-                val serverFrame = withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.SERVER) }
-
-                when (serverFrame.contentType) {
-                    FrameContentType.TEXT, FrameContentType.BINARY -> receiveQueue.offer(serverFrame)
-
-                    FrameContentType.PING -> {
-                        val pongFrame = WebsocketFrame(FrameType.CLIENT, FrameContentType.PONG, serverFrame.content)
-                        sendQueue.offer(pongFrame)
-                    }
-
-                    FrameContentType.PONG -> connStatus = ConnectionStatus.RUNNING
-
-                    else -> TODO("receive other frame")
-                }
-            } catch (e: TimeoutCancellationException) {
-                // start ping-pong handle
-                if (connStatus == ConnectionStatus.RUNNING) {
-                    val pingFrame = WebsocketFrame(FrameType.CLIENT, FrameContentType.PING, "ping".toByteArray())
-                    sendQueue.offer(pingFrame)
-                    connStatus = ConnectionStatus.PING
-                } else {
-                    closeConnection()
-                    break
-                }
-            }
-
-        }
-    }
-
-    private suspend fun send() {
-        while (true) {
-            if (connStatus == ConnectionStatus.CLOSED) break
-
-            val clientFrame = sendQueue.receiveOrNull()
-            if (clientFrame != null) socketChannel.aWrite(ByteBuffer.wrap(clientFrame.frameByteArray))
-            else break
-        }
-    }*/
 
     private fun closeConnection() {
         connStatus = ConnectionStatus.CLOSED
@@ -90,7 +41,7 @@ class ClientWebsocketConnection(val host: String, val port: Int) : WebsocketConn
         return withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.SERVER) }
     }
 
-    override suspend fun putFrame(data: ByteArray) {
+    suspend fun putFrame(data: ByteArray) {
         putFrame(data, FrameContentType.BINARY)
     }
 

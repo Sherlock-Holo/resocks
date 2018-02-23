@@ -33,68 +33,12 @@ class ServerWebsocketConnection private constructor(private val socketChannel: A
         }*/
     }
 
-    /*private suspend fun receive() {
-        while (true) {
-            try {
-                val clientFrame = withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.CLIENT) }
-
-                when (clientFrame.contentType) {
-                    FrameContentType.TEXT, FrameContentType.BINARY -> receiveQueue.offer(clientFrame)
-
-                    FrameContentType.PING -> {
-                        val pongFrame = WebsocketFrame(FrameType.SERVER, FrameContentType.PONG, clientFrame.content)
-                        sendQueue.offer(pongFrame)
-                    }
-
-                    FrameContentType.PONG -> connStatus = ConnectionStatus.RUNNING
-
-                    else -> TODO("other frame")
-                }
-            } catch (e: TimeoutCancellationException) {
-                // start ping-pong handle
-                if (connStatus == ConnectionStatus.RUNNING) {
-                    val pingFrame = WebsocketFrame(FrameType.SERVER, FrameContentType.PING, "pong".toByteArray())
-                    sendQueue.offer(pingFrame)
-                    connStatus = ConnectionStatus.PING
-                } else {
-                    closeConnection()
-                    break
-                }
-            }
-        }
-    }
-
-    private suspend fun send() {
-        while (true) {
-            if (connStatus == ConnectionStatus.CLOSED) break
-
-            val serverFrame = sendQueue.receiveOrNull()
-            if (serverFrame != null) socketChannel.aWrite(ByteBuffer.wrap(serverFrame.frameByteArray))
-            else break
-        }
-    }*/
-
-    /*override suspend fun getFrame(): Frame {
-        if (connStatus == ConnectionStatus.RUNNING) return receiveQueue.receive()
-        else throw WebsocketException("connection is closed")
-    }*/
-
     override suspend fun getFrame(): Frame {
         val frame = withTimeout(1000 * 60 * 5) { WebsocketFrame.receiveFrame(readsBuffer, FrameType.CLIENT) }
         return frame
     }
 
-    override suspend fun putFrame(data: ByteArray) = putFrame(data, FrameContentType.BINARY)
-
-    /*override fun putFrame(data: ByteArray, contentType: FrameContentType): Boolean {
-        when (contentType) {
-            FrameContentType.PING, FrameContentType.PONG, FrameContentType.CLOSE -> throw WebsocketException("not allow content type")
-            else -> {
-                if (connStatus == ConnectionStatus.RUNNING) return sendQueue.offer(WebsocketFrame(FrameType.SERVER, contentType, data))
-                else throw WebsocketException("connection is closed")
-            }
-        }
-    }*/
+    suspend fun putFrame(data: ByteArray) = putFrame(data, FrameContentType.BINARY)
 
     override suspend fun putFrame(data: ByteArray, contentType: FrameContentType) {
         val frame = WebsocketFrame(FrameType.SERVER, contentType, data)
@@ -105,11 +49,6 @@ class ServerWebsocketConnection private constructor(private val socketChannel: A
     private fun closeConnection() {
         connStatus = ConnectionStatus.CLOSED
 
-        /*receiveQueue.cancel()
-        sendQueue.cancel()
-
-        socketChannel.shutdownInput()
-        socketChannel.shutdownOutput()*/
         socketChannel.close()
     }
 
